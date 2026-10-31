@@ -160,7 +160,7 @@ public sealed class FTS
 
         if (EventsList.Count == 0)
         {
-            Screen.Show("В Pass Storage нет мероприятий с данными о продажах");
+            Screen.Show("В Event Storage нет мероприятий с данными о продажах");
             return EventsList;
         }
 
