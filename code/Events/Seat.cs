@@ -9,7 +9,7 @@ public class Seat
     double price;
     SeatStatus status;
 
-    Seat(int id, int sector, int row, int column, double price = 1200, SeatStatus status = SeatStatus.Free) {
+    public Seat(int id, int sector, int row, int column, double price = 1200, SeatStatus status = SeatStatus.Free) {
         this.id = id;
         this.sector = sector;
         this.row = row;

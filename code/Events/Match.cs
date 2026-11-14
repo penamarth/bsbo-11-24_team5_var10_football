@@ -11,16 +11,16 @@ public class Match {
     public Tuple<int,int> matchTime;
 
     public bool setSeatStatus(int seatId, SeatStatus status) {
-        return this->stadiumMap.setSeatStatus(seatId, status);
+        return this.stadiumMap.setSeatStatus(seatId, status);
     }
     public bool setSeatPrice(int seatId, double price) {
-        return this->stadiumMap.setSeatPrice(seatId, price);
+        return this.stadiumMap.setSeatPrice(seatId, price);
     }
     public StadiumMap getMap() {
-        return this->stadiumMap;
+        return this.stadiumMap;
     }
     public int getId() {
-        return this->id;
+        return this.id;
     }
 
 }

@@ -8,9 +8,9 @@ public class Event {
     public Tuple<int,int> eventTime;
 
     public Event(int id, string name, Tuple<int, int> eventTime) {
-        this->name = name;
-        this->eventTime = eventTime;
-        this->matches = new List<Match>{};
+        this.name = name;
+        this.eventTime = eventTime;
+        this.matches = new List<Match>{};
     }
 
     public Match findMatchById(int matchId) {
@@ -18,15 +18,16 @@ public class Event {
             if (match.getId() == matchId)
                 return match;
         }
+        return null;
     }
-    public bool addMatch(Match match) {
-        return this->matches.Add(match);
+    public void addMatch(Match match) {
+        this.matches.Add(match);
     }
     public int getId() {
-        return this->id;
+        return this.id;
     }
     public int lastId() {
-    int last;
+    int last = 1;
     foreach (Match m in matches) {
         last = m.getId();
     }
@@ -34,7 +35,7 @@ public class Event {
 }
 
     public void setId(int id) {
-        this->id = id;
+        this.id = id;
         return;
     }
 }
