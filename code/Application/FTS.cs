@@ -701,8 +701,12 @@ public class FTS
 		public List<Event> ManageAnalytics()
 		{
 				List<Event> events = _eventStorage.GetEvents()
-						.Where(e => _passStorage.HasSalesForEvent(e))
-						.ToList();
+						.Where(e =>
+										{
+										HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
+										return _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds)).Count > 0;
+										})
+				.ToList();
 
 				Console.Write("\x1b[2J\x1b[H");
 				Console.WriteLine("===== ANALYTICS: EVENTS =====");
@@ -733,8 +737,9 @@ public class FTS
 				}
 
 				_analyticsEvent = e;
-				_analyticsPasses = _passStorage.GetPassesForEvent(e);
 				_analyticsReport = null;
+				HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
+				_analyticsPasses = _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds));
 
 				Console.WriteLine($"Event: {e.Name}");
 				Console.WriteLine($"Tickets/subscriptions found: {_analyticsPasses.Count}");
