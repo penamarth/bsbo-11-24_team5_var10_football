@@ -20,7 +20,7 @@ public async Task StartEventCreation() {
                 if (DateTimeOffset.TryParseExact(input, "dd.MM.yyyy HH:mm", DateTimeStyles.AssumeLocal, out DateTimeOffset endTime))
                     int endDate = startTime.ToUnixTimeSeconds();
                 Event newEvent = Event(id, name, (startDate, endDate));
-                _eventStorage.addEvent(newEvent);
+                _eventStorage.createEvent(newEvent);
             case "2":
                 Console.WriteLine("(Select Event With Id)> ");
                 int id = Convert.ToInt32(Console.ReadLine());

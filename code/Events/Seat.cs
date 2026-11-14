@@ -10,27 +10,27 @@ public class Seat
     SeatStatus status;
 
     Seat(int id, int sector, int row, int column, double price = 1200, SeatStatus status = SeatStatus.Free) {
-        this->id = id;
-        this->sector = sector;
-        this->row = row;
-        this->column = column;
-        this->price = price;
-        this->status = status;
+        this.id = id;
+        this.sector = sector;
+        this.row = row;
+        this.column = column;
+        this.price = price;
+        this.status = status;
     }
 
     public int getId()
     {
-        return this->id;
+        return this.id;
     }
-    public bool setStatus(SeatStatus newStatus)
+    public void setStatus(SeatStatus newStatus)
     {
-        this->status = newStatus;
+        this.status = newStatus;
     }
     public SeatStatus getStatus()
     {
-        return this->status;
+        return this.status;
     }
-    public bool changePrice(double price) {
-        return this->price = price;
+    public void changePrice(double price) {
+        this.price = price;
     }
 }
