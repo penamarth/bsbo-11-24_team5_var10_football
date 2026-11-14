@@ -26,12 +26,17 @@ public class Match
 
 		public bool SetSeatStatus(int seatId, SeatStatus status)
 		{
-				if (!SeatStatuses.ContainsKey(seatId) && SeatStatuses[seatId] == status)
+				if (SeatStatuses.TryGetValue(seatId, out SeatStatus current) && current == status)
 				{
 						return false;
 				}
-				
+
 				SeatStatuses[seatId] = status;
 				return true;
+		}
+
+		public SeatStatus GetSeatStatus(int seatId)
+		{
+				return SeatStatuses.GetValueOrDefault(seatId, SeatStatus.Free);
 		}
 }

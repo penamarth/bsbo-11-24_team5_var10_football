@@ -11,6 +11,7 @@ public abstract class Pass
 		public bool IsRefunded;
 		public PaymentType? PaymentMethod;
 		public string? PaymentCredentials;
+		public string QRCode = "";
 
 		public abstract bool CheckAccess(int matchId);
 		public abstract bool MarkUsed(int matchId);

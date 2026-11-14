@@ -8,7 +8,8 @@ using System.Linq;
 
 public class EventStorage
 {
-		private List<Event> _events;
+		private List<Event> _events = new();
+		private Dictionary<(int MatchID, int SeatID), int> _bookingDeadlines = new();
 
 		public List<Event> GetEvents()
 		{
@@ -47,7 +48,7 @@ public class EventStorage
 				return true;
 		}
 
-		public bool ReserveSeat(int matchId, int seatId)
+		public bool ReserveSeat(int matchId, int seatId, int timeoutSeconds = 300)
 		{
 				Match? match = FindMatchByID(matchId);
 				if (match == null)
@@ -55,7 +56,55 @@ public class EventStorage
 						return false;
 				}
 
-				return match.SetSeatStatus(seatId, SeatStatus.Booked);
+				SeatStatus status = match.GetSeatStatus(seatId);
+				if (status == SeatStatus.Booked && CheckBooking(matchId, seatId))
+				{
+						return false;
+				}
+
+				if (status != SeatStatus.Free && status != SeatStatus.Booked)
+				{
+						return false;
+				}
+
+				if (!match.SetSeatStatus(seatId, SeatStatus.Booked))
+				{
+						return false;
+				}
+
+				_bookingDeadlines[(matchId, seatId)] = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + timeoutSeconds;
+				return true;
+		}
+
+		public bool CheckBooking(int matchId, int seatId)
+		{
+				Match? match = FindMatchByID(matchId);
+				if (match == null || match.GetSeatStatus(seatId) != SeatStatus.Booked)
+				{
+						return false;
+				}
+
+				if (_bookingDeadlines.TryGetValue((matchId, seatId), out int deadline)
+						&& DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= deadline)
+				{
+						// 14а: оплата не поступила вовремя, бронь снимается автоматически
+						ReleaseSeat(matchId, seatId);
+						return false;
+				}
+
+				return true;
+		}
+
+		public bool ReleaseSeat(int matchId, int seatId)
+		{
+				Match? match = FindMatchByID(matchId);
+				if (match == null || match.GetSeatStatus(seatId) != SeatStatus.Booked)
+				{
+						return false;
+				}
+
+				_bookingDeadlines.Remove((matchId, seatId));
+				return match.SetSeatStatus(seatId, SeatStatus.Free);
 		}
 
 		public bool UpdateEvent(int id, Event newEvent)
