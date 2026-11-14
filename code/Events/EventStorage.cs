@@ -36,15 +36,19 @@ public class EventStorage
 
 		public bool CreateMatch(int eventId, Match match)
 		{
-				Event? e = FindEventByID(eventId);
-				if (e == null)
+				Event? targetEvent = FindEventByID(eventId);
+				if (targetEvent == null)
 				{
 						return false;
 				}
+
 				match.ID = _events
-						.SelectMany(e => e.Matches)
-						.Max(m => m.ID);
-				e.AddMatch(match);
+						.SelectMany(ev => ev.Matches)
+						.Select(m => m.ID)
+						.DefaultIfEmpty(0)
+						.Max() + 1;
+
+				targetEvent.AddMatch(match);
 				return true;
 		}
 

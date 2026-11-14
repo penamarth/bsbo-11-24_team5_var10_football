@@ -16,7 +16,7 @@ static public class SberbankAPI
 				return "https://bank.purchase.link/random-purchase-id";
 		}
 
-		static public async Task<string?> PurchaseStatus(string url)
+		static public async Task<string> PurchaseStatus(string url)
 		{
 				await Task.Delay(1000);
 				return "success";

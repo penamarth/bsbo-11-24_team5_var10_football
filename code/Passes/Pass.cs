@@ -7,7 +7,7 @@ public abstract class Pass
 		public int ID;
 		public int SeatID;
 		public double Price;
-		public string Email;
+		public string Email = "";
 		public bool IsRefunded;
 		public PaymentType? PaymentMethod;
 		public string? PaymentCredentials;

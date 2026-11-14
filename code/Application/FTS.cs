@@ -29,6 +29,20 @@ public class FTS
 		public async Task Run()
 		{
 				_passStorage.CreatePass(new Ticket(0, 100));
+				var map = new StadiumMap();
+				map.Seats = new List<Seat>{new Seat(1, 1, 1, 1, 1000), new Seat(2, 2, 1, 1, 2000)};
+				int now = (int) DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+				int nextWeek = (int) DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeSeconds();
+				var createdEvent = new Event(0, "Event", new List<Match>(), now, nextWeek);
+				_eventStorage.CreateEvent(createdEvent);
+
+				if (createdEvent != null)
+				{
+						var match = new Match(0, "Match", 1.5, map, now, nextWeek);
+						_eventStorage.CreateMatch(createdEvent.ID, match);
+						match.SetSeatStatus(2, SeatStatus.Booked);
+				}
+
 
 				string msg = "1-5";
 				for(;;)
@@ -44,7 +58,7 @@ public class FTS
 						Console.Write($"{msg}> ");
 						msg = "1-5";
 
-						string ans = Console.ReadLine();
+						string? ans = Console.ReadLine();
 						switch(ans)
 						{
 								case "1":
@@ -330,8 +344,8 @@ public class FTS
 				Console.WriteLine("===== PURCHASE DETAILS =====");
 				Console.WriteLine($"Event:          {ev.Name}");
 				Console.WriteLine(isSubscription
-						? $"Subscription:   all {matchCount} matches of the season"
-						: $"Match:          {match.Name} ({FormatDate(match.StartUnixTimestamp)})");
+								? $"Subscription:   all {matchCount} matches of the season"
+								: $"Match:          {match.Name} ({FormatDate(match.StartUnixTimestamp)})");
 				Console.WriteLine($"Seat:           {seat.ID} (sector {seat.Sector}, row {seat.Row}, place {seat.Column})");
 				Console.WriteLine($"Total price:    {price:F2}");
 				Console.WriteLine("============================");
