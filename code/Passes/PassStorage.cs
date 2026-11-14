@@ -40,4 +40,29 @@ public class PassStorage
     {
         return _passes.FirstOrDefault(p => p.ID == passId);
     }
+
+    public List<Pass> GetPassesForEvent(Event e)
+    {
+        HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
+
+        return _passes.Where(p => CoversAnyMatch(p, matchIds)).ToList();
+    }
+
+    public bool HasSalesForEvent(Event e)
+    {
+        return GetPassesForEvent(e).Count > 0;
+    }
+
+    private static bool CoversAnyMatch(Pass pass, HashSet<int> matchIds)
+    {
+        switch (pass)
+        {
+            case Ticket ticket:
+                return matchIds.Contains(ticket.MatchID);
+            case Subscription subscription:
+                return subscription.MatchIDs.Overlaps(matchIds);
+            default:
+                return false;
+        }
+    }
 }

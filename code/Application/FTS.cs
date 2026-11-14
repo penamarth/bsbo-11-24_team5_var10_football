@@ -14,7 +14,10 @@ public class FTS
 		private Storages.PassStorage _passStorage;
 		private Storages.EventStorage _eventStorage;
 		private Banking.IBankAdapter _bank;
-		private List<Report> _reports;
+		private List<Report> _reports = new();
+		private Event? _analyticsEvent;
+		private List<Pass> _analyticsPasses = new();
+		private Report? _analyticsReport;
 
 		public FTS(Storages.PassStorage passStorage, Storages.EventStorage eventStorage, Banking.IBankAdapter bank)
 		{
@@ -52,6 +55,7 @@ public class FTS
 										await StartRefund();
 										break;
 								case "4":
+										RunAnalytics();
 										break;
 								case "5":
 										break;
@@ -196,6 +200,145 @@ public class FTS
 				Console.WriteLine(text);
 				Console.WriteLine("===================");
 				return true;
+		}
+
+		public void RunAnalytics()
+		{
+				List<Event> events = ManageAnalytics();
+				if (events.Count == 0)
+				{
+						WaitForEnter();
+						return;
+				}
+
+				Console.Write("Select an event ID (or press Enter to cancel): ");
+				string? input = Console.ReadLine();
+				if (string.IsNullOrWhiteSpace(input))
+				{
+						return;
+				}
+
+				if (!int.TryParse(input, out int eventId))
+				{
+						Console.WriteLine("Invalid event ID.");
+						WaitForEnter();
+						return;
+				}
+
+				if (!SelectEvent(eventId))
+				{
+						WaitForEnter();
+						return;
+				}
+
+				Report? report = CalculateMetrics();
+				if (report == null)
+				{
+						WaitForEnter();
+						return;
+				}
+
+				Console.Write("Export the report (c - CSV, t - TXT, Enter - skip): ");
+				string? choice = Console.ReadLine();
+				switch (choice)
+				{
+						case "c":
+								ExportReport(ReportFormat.Csv);
+								break;
+						case "t":
+								ExportReport(ReportFormat.Txt);
+								break;
+				}
+
+				WaitForEnter();
+		}
+
+		public List<Event> ManageAnalytics()
+		{
+				List<Event> events = _eventStorage.GetEvents()
+						.Where(e => _passStorage.HasSalesForEvent(e))
+						.ToList();
+
+				Console.Write("\x1b[2J\x1b[H");
+				Console.WriteLine("===== ANALYTICS: EVENTS =====");
+
+				if (events.Count == 0)
+				{
+						Console.WriteLine("No events with sales data.");
+				}
+				else
+				{
+						foreach (Event e in events)
+						{
+								Console.WriteLine($"{e.ID}. {e.Name}");
+						}
+				}
+
+				Console.WriteLine("============================");
+				return events;
+		}
+
+		public bool SelectEvent(int eventId)
+		{
+				Event? e = _eventStorage.FindEventByID(eventId);
+				if (e == null)
+				{
+						Console.WriteLine("Event not found.");
+						return false;
+				}
+
+				_analyticsEvent = e;
+				_analyticsPasses = _passStorage.GetPassesForEvent(e);
+				_analyticsReport = null;
+
+				Console.WriteLine($"Event: {e.Name}");
+				Console.WriteLine($"Tickets/subscriptions found: {_analyticsPasses.Count}");
+				return true;
+		}
+
+		public Report? CalculateMetrics()
+		{
+				if (_analyticsEvent == null)
+				{
+						Console.WriteLine("Select an event first.");
+						return null;
+				}
+
+				Report report = new(_analyticsEvent, _analyticsPasses);
+				report.CalculateMetrics();
+
+				_reports.RemoveAll(r => r.EventID == report.EventID);
+				_reports.Add(report);
+				_analyticsReport = report;
+
+				Console.WriteLine(report);
+				return report;
+		}
+
+		public string? ExportReport(ReportFormat format)
+		{
+				if (_analyticsReport == null)
+				{
+						Console.WriteLine("No report has been calculated yet.");
+						return null;
+				}
+
+				string directory = Path.Combine(Directory.GetCurrentDirectory(), "reports");
+				Directory.CreateDirectory(directory);
+
+				string extension = format == ReportFormat.Csv ? "csv" : "txt";
+				string path = Path.Combine(directory, $"report_{_analyticsReport.EventID}.{extension}");
+				string content = format == ReportFormat.Csv ? _analyticsReport.ToCsv() : _analyticsReport.ToString();
+
+				File.WriteAllText(path, content);
+				Console.WriteLine($"Report exported to {path}");
+				return path;
+		}
+
+		private static void WaitForEnter()
+		{
+				Console.Write("Press Enter to return to the menu...");
+				Console.ReadLine();
 		}
 
 		public Report? GetReport(int eventId)

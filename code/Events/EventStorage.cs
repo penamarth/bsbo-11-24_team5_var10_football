@@ -8,7 +8,7 @@ using System.Linq;
 
 public class EventStorage
 {
-		private List<Event> _events;
+		private List<Event> _events = new();
 
 		public List<Event> GetEvents()
 		{
