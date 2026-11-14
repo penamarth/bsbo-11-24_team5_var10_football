@@ -1,37 +1,26 @@
-namespace FootballSystem.Models;
+using System;
+using System.Numerics;
+namespace FootballSystem.Events;
 
-using FootballSystem.Enums;
+public class Match {
+    int id;
+    public string name;
+    public string description;
+    double priceCoefficient;
+    StadiumMap stadiumMap;
+    public Tuple<int,int> matchTime;
 
-using System.Collections.Generic;
+    public bool setSeatStatus(int seatId, SeatStatus status) {
+        return this->stadiumMap.setSeatStatus(seatId, status);
+    }
+    public bool setSeatPrice(int seatId, double price) {
+        return this->stadiumMap.setSeatPrice(seatId, price);
+    }
+    public StadiumMap getMap() {
+        return this->stadiumMap;
+    }
+    public int getId() {
+        return this->id;
+    }
 
-public class Match
-{
-		public int ID;
-		public string Name;
-		public double PriceCoefficient = 1.0;
-		public StadiumMap StadiumMap;
-		public int StartUnixTimestamp;
-		public int EndUnixTimestamp;
-		public Dictionary<int, SeatStatus> SeatStatuses = new();
-		
-		public Match(int id, string name, double priceCoefficient, StadiumMap map, int start, int end)
-		{
-				ID = id;
-				Name = name;
-				PriceCoefficient = priceCoefficient;
-				StadiumMap = map;
-				StartUnixTimestamp = start;
-				EndUnixTimestamp = end;
-		}
-
-		public bool SetSeatStatus(int seatId, SeatStatus status)
-		{
-				if (!SeatStatuses.ContainsKey(seatId) && SeatStatuses[seatId] == status)
-				{
-						return false;
-				}
-				
-				SeatStatuses[seatId] = status;
-				return true;
-		}
 }

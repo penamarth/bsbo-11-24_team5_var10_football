@@ -1,9 +1,9 @@
-namespace FootballSystem.Enums;
+namespace FootballSystem.Events;
 
 public enum SeatStatus
 {
-		Free,
-		Booked,
-		Sold,
-		Blocked
+    Free,
+    Booked,
+    Sold,
+    Blocked
 }

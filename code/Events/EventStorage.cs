@@ -1,96 +1,56 @@
-namespace FootballSystem.Storages;
-
-using FootballSystem.Models;
-using FootballSystem.Enums;
-
+using System;
 using System.Collections.Generic;
-using System.Linq;
+namespace FootballSystem.Events;
 
-public class EventStorage
-{
-		private List<Event> _events;
+public class EventStorage {
+    List<Event> events;
 
-		public List<Event> GetEvents()
-		{
-				return _events;
-		}
+    public List<Event> getEvents() { return this->events; }
+    public bool addEvent(Event e) {
+        return this->events.Add(e); 
+    }
+    public Event findEventById(int eventId) {
+        foreach (Event e in events) {
+            if (e.getId() == eventId)
+                return e;
+        }
+    }
+    public void cleanList() {
+        foreach (Event e in events) {
+            if (e.eventTime.Item2 < (int) DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                events.RemoveAt(events.IndexOf(e));
+        }
+        int lastId = 1;
+        foreach (Event e in events) {
+            if (e.getId > lastId) {
+                e.setId(lastId);
+                lastId++;
+            }
+        }
+        return;
+    }
+    public int lastId() {
+        int last;
+        foreach (Event e in events) {
+            last = e.getId();
+        }
+        return last;
+    }
 
-		public Event? FindEventByID(int id)
-		{
-				return _events.FirstOrDefault(e => e.ID == id);
-		}
+    public bool createEvent(Event e) {
+        return events.Add(e);
+    }
 
-		public Match? FindMatchByID(int id)
-		{
-			return _events
-				.Select(e => e.FindMatchByID(id))
-				.FirstOrDefault(match => match != null);
-		}
-
-		public void CreateEvent(Event e)
-		{
-				e.ID = _events.Count;
-				_events.Add(e);
-		}
-
-		public bool CreateMatch(int eventId, Match match)
-		{
-				Event? e = FindEventByID(eventId);
-				if (e == null)
-				{
-						return false;
-				}
-				match.ID = _events
-						.SelectMany(e => e.Matches)
-						.Max(m => m.ID);
-				e.AddMatch(match);
-				return true;
-		}
-
-		public bool ReserveSeat(int matchId, int seatId)
-		{
-				Match? match = FindMatchByID(matchId);
-				if (match == null)
-				{
-						return false;
-				}
-
-				return match.SetSeatStatus(seatId, SeatStatus.Booked);
-		}
-
-		public bool UpdateEvent(int id, Event newEvent)
-		{
-			Event? e = FindEventByID(id);
-			if (e == null)
-			{
-				return false;
-			}
-
-			e.ID = id;
-			e.Name = newEvent.Name;
-			e.Matches = newEvent.Matches;
-			e.StartUnixTimestamp = newEvent.StartUnixTimestamp;
-			e.EndUnixTimestamp = newEvent.EndUnixTimestamp;
-
-			return true;
-		}
-
-		public bool UpdateMatch(int id, Match newMatch)
-		{
-			Match? match = FindMatchByID(id);
-			if (match == null)
-			{
-				return false;
-			}
-
-			match.ID = id;
-			match.Name = newMatch.Name;
-			match.PriceCoefficient = newMatch.PriceCoefficient;
-			match.StadiumMap = newMatch.StadiumMap;
-			match.StartUnixTimestamp = newMatch.StartUnixTimestamp;
-			match.EndUnixTimestamp = newMatch.EndUnixTimestamp;
-			match.SeatStatuses = newMatch.SeatStatuses;
-
-			return true;
-		}
+    public bool createMatch(int eventId, Match match) {
+        if (findEventById(eventId))
+            return findEventById(eventId).addMatch(match);
+        else
+            return false;
+    }
+    public bool updateEvent(int eventId, Event newEvent) {
+        return findEventById(eventId) = newEvent;
+    }
+    public bool updateMatch(int eventId, int matchId, Match newMatch) {
+        return findEventById(eventId).findMatchById(matchId) = newMatch;
+    }
 }
