@@ -1,4 +1,4 @@
-namespace FootballSystem.Enums;
+namespace FootballSystem.Analytics;
 
 public enum ReportFormat
 {

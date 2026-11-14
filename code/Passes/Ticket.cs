@@ -1,4 +1,4 @@
-namespace FootballSystem.Models;
+namespace FootballSystem.Passes;
 
 public class Ticket : Pass
 {

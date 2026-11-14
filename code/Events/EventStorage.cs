@@ -1,7 +1,4 @@
-namespace FootballSystem.Storages;
-
-using FootballSystem.Models;
-using FootballSystem.Enums;
+namespace FootballSystem.Events;
 
 using System.Collections.Generic;
 using System.Linq;
@@ -30,7 +27,7 @@ public class EventStorage
 
 		public void CreateEvent(Event e)
 		{
-				e.ID = _events.Count;
+				e.ID = _events.Count + 1;
 				_events.Add(e);
 		}
 
@@ -91,7 +88,6 @@ public class EventStorage
 				if (_bookingDeadlines.TryGetValue((matchId, seatId), out int deadline)
 						&& DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= deadline)
 				{
-						// 14а: оплата не поступила вовремя, бронь снимается автоматически
 						ReleaseSeat(matchId, seatId);
 						return false;
 				}
@@ -103,6 +99,18 @@ public class EventStorage
 		{
 				Match? match = FindMatchByID(matchId);
 				if (match == null || match.GetSeatStatus(seatId) != SeatStatus.Booked)
+				{
+						return false;
+				}
+
+				_bookingDeadlines.Remove((matchId, seatId));
+				return match.SetSeatStatus(seatId, SeatStatus.Free);
+		}
+
+		public bool RefundSeat(int matchId, int seatId)
+		{
+				Match? match = FindMatchByID(matchId);
+				if (match == null || match.GetSeatStatus(seatId) != SeatStatus.Sold)
 				{
 						return false;
 				}

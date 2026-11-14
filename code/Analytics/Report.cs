@@ -1,4 +1,7 @@
-namespace FootballSystem.Models;
+namespace FootballSystem.Analytics;
+
+using FootballSystem.Passes;
+using FootballSystem.Events;
 
 using System;
 using System.Collections.Generic;

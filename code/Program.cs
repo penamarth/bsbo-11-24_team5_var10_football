@@ -1,7 +1,7 @@
-﻿using FootballSystem.Enums;
-using FootballSystem.Models;
-using FootballSystem.Storages;
+﻿using FootballSystem.Application;
+using FootballSystem.Events;
 using FootballSystem.Banking;
+using FootballSystem.Passes;
 
 using System;
 using System.Threading.Tasks;

@@ -1,8 +1,9 @@
-namespace FootballSystem.Models;
+namespace FootballSystem.Application;
 
-using FootballSystem.Storages;
+using FootballSystem.Passes;
 using FootballSystem.Banking;
-using FootballSystem.Enums;
+using FootballSystem.Analytics;
+using FootballSystem.Events;
 
 using System;
 using System.Collections.Generic;
@@ -11,15 +12,15 @@ using System.Linq;
 
 public class FTS
 {
-		private Storages.PassStorage _passStorage;
-		private Storages.EventStorage _eventStorage;
+		private PassStorage _passStorage;
+		private EventStorage _eventStorage;
 		private Banking.IBankAdapter _bank;
 		private List<Report> _reports = new();
 		private Event? _analyticsEvent;
 		private List<Pass> _analyticsPasses = new();
 		private Report? _analyticsReport;
 
-		public FTS(Storages.PassStorage passStorage, Storages.EventStorage eventStorage, Banking.IBankAdapter bank)
+		public FTS(PassStorage passStorage, EventStorage eventStorage, Banking.IBankAdapter bank)
 		{
 				_passStorage = passStorage;
 				_eventStorage = eventStorage;
@@ -33,7 +34,7 @@ public class FTS
 				map.Seats = new List<Seat>{new Seat(1, 1, 1, 1, 1000), new Seat(2, 2, 1, 1, 2000)};
 				int now = (int) DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 				int nextWeek = (int) DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeSeconds();
-				var createdEvent = new Event(0, "Event", new List<Match>(), now, nextWeek);
+				var createdEvent = new Event(1, "Event", new List<Match>(), now, nextWeek);
 				_eventStorage.CreateEvent(createdEvent);
 
 				if (createdEvent != null)
@@ -85,7 +86,6 @@ public class FTS
 
 		public async Task StartPurchase()
 		{
-				// Шаги 1-3: список мероприятий, открытых для продажи
 				List<Event> events = GetAvailableEvents();
 				if (events.Count == 0)
 				{
@@ -97,7 +97,6 @@ public class FTS
 				Event? ev = SelectEvent(events);
 				if (ev == null) return;
 
-				// Шаг 4: билет на матч или абонемент на сезон
 				bool? isSubscription = RequestPurchaseType();
 				if (isSubscription == null) return;
 
@@ -123,7 +122,6 @@ public class FTS
 						seasonMatches = new List<Match> { match };
 				}
 
-				// Шаги 5-8: схема стадиона и бронь места на время оплаты (8а: место занято — схема обновляется)
 				StadiumMap? map = GetSeatMap(match.ID);
 				if (map == null)
 				{
@@ -144,7 +142,6 @@ public class FTS
 
 						if (ReserveSeats(seasonMatches, seatId.Value)) break;
 
-						ReleaseSeats(seasonMatches, seatId.Value);
 						Console.WriteLine("This seat is already taken. The seat map has been updated.");
 				}
 
@@ -157,7 +154,6 @@ public class FTS
 
 				double price = CalculatePrice(seat, seasonMatches);
 
-				// Шаги 9-10: покупателю показаны матч/абонемент, место и стоимость
 				if (!ShowPurchaseDetails(ev, match, seat, price, isSubscription.Value, seasonMatches.Count))
 				{
 						ReleaseSeats(seasonMatches, seatId.Value);
@@ -165,7 +161,6 @@ public class FTS
 						return;
 				}
 
-				// Шаги 11-12: адрес электронной почты (12а: некорректный адрес вводится повторно)
 				string? email = RequestEmail();
 				if (email == null)
 				{
@@ -174,7 +169,6 @@ public class FTS
 						return;
 				}
 
-				// Шаги 13-17: оплата (16а: банк недоступен, 17а: платёж отклонён, 14а: бронь истекла)
 				string description = isSubscription.Value
 						? $"FTS subscription: {ev.Name}, seat {seat.ID}"
 						: $"FTS ticket: {ev.Name} / {match.Name}, seat {seat.ID}";
@@ -203,8 +197,6 @@ public class FTS
 						}
 				}
 
-				// Шаги 18-19: создаётся Ticket/Subscription с уникальным QR-кодом и сохраняется в PassStorage,
-				// место помечается как проданное (для абонемента — во всех матчах сезона)
 				Pass pass = isSubscription.Value
 						? BuildSubscription(ev, seasonMatches)
 						: new Ticket(match.ID, price);
@@ -220,10 +212,8 @@ public class FTS
 				foreach (Match m in seasonMatches)
 						ev.SetSeatStatus(m.ID, seatId.Value, SeatStatus.Sold);
 
-				// Шаг 20: покупателю показывается страница подтверждения с QR-кодом
 				ShowPurchaseConfirmation(pass);
 
-				// Шаг 21: письмо с электронной копией билета/абонемента и электронным чеком
 				await SendTicketEmail(pass);
 
 				Pause();
@@ -562,7 +552,16 @@ public class FTS
 				if (!_passStorage.Refund(pass.ID))
 						Console.WriteLine("Warning: this pass was already marked as refunded.");
 
+				if (pass is Ticket ticket) {
+						_eventStorage.RefundSeat(ticket.MatchID, ticket.SeatID);
+				} else if (pass is Subscription sub) {
+						foreach (int id in sub.MatchIDs) {
+								_eventStorage.RefundSeat(id, sub.SeatID);
+						}
+				}
+
 				await GiveReceipt(pass);
+				WaitForEnter();
 		}
 
 		public bool ShowRefundDetails(Pass pass)
@@ -794,7 +793,6 @@ public class FTS
 
 		public List<Event> GetAvailableEvents()
 		{
-				// открыты для продажи мероприятия, которые ещё не закончились
 				return _eventStorage.GetEvents().Where(e => e.EndUnixTimestamp > DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ToList();
 		}
 

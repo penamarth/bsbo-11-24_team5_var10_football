@@ -1,4 +1,4 @@
-namespace FootballSystem.Enums;
+namespace FootballSystem.Events;
 
 public enum SeatStatus
 {

@@ -1,4 +1,4 @@
-namespace FootballSystem.Models;
+namespace FootballSystem.Events;
 
 public class Seat
 {

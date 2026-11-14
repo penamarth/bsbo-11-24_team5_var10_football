@@ -1,4 +1,4 @@
-namespace FootballSystem.Models;
+namespace FootballSystem.Passes;
 
 using System.Collections.Generic;
 

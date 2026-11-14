@@ -1,6 +1,6 @@
-namespace FootballSystem.Storages;
+namespace FootballSystem.Passes;
 
-using FootballSystem.Models;
+using FootballSystem.Events;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -12,7 +12,7 @@ public class PassStorage
 
     public void CreatePass(Pass pass)
     {
-        pass.ID = _passes.Count;
+        pass.ID = _passes.Count + 1;
         _passes.Add(pass);
     }
 

@@ -1,6 +1,4 @@
-namespace FootballSystem.Models;
-
-using FootballSystem.Enums;
+namespace FootballSystem.Passes;
 
 public abstract class Pass
 {

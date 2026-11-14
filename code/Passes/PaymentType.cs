@@ -1,4 +1,4 @@
-namespace FootballSystem.Enums;
+namespace FootballSystem.Passes;
 
 public enum PaymentType
 {
