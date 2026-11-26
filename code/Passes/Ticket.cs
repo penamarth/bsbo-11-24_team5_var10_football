@@ -1,32 +1,40 @@
 namespace FootballSystem.Passes;
 
+using System;
+
 public class Ticket : Pass
 {
-    public int MatchID;
-    public bool Used = false;
-    
-	public Ticket(int matchId, double price) {
-			MatchID = matchId;
-			Price = price;
-	}
+    public int matchId;
+    public bool used = false;
 
-    public override bool CheckAccess(int matchId) 
+    public Ticket(int matchId, double price)
     {
-        return !Used && matchId == MatchID;
+        Console.WriteLine($"[ВЫЗОВ] Ticket.create(matchId={matchId}, price={price:F2})");
+        this.matchId = matchId;
+        this.price = price;
     }
 
-    public override bool MarkUsed(int matchId) 
+    public override bool checkAccess(int matchId)
     {
-        if (matchId != MatchID || Used) 
+        Console.WriteLine($"[ВЫЗОВ] Ticket.checkAccess(matchId={matchId})");
+        return !used && matchId == this.matchId;
+    }
+
+    public override bool markUsed(int matchId)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Ticket.markUsed(matchId={matchId})");
+        if (matchId != this.matchId || used)
         {
             return false;
         }
-        Used = true;
+
+        used = true;
         return true;
     }
 
-    public override bool CheckRefundEligibility() 
+    public override bool checkRefundEligibility()
     {
-        return !IsRefunded && !Used;
+        Console.WriteLine("[ВЫЗОВ] Ticket.checkRefundEligibility()");
+        return !isRefunded && !used;
     }
 }

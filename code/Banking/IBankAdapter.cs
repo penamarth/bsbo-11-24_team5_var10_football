@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 public interface IBankAdapter
 {
-		public Task<bool> Refund(string receiver, string description, double amount);
-		public Task<string?> StartPurchase(string description, double amount);
-		public Task<string> ConfirmPurchase(string url);
+    Task<bool> refund(string receiver, string description, double amount);
+    Task<string?> startPurchase(string description, double amount);
+    Task<string> confirmPurchase(string url);
 }

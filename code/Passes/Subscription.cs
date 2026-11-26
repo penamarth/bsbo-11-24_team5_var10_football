@@ -1,33 +1,42 @@
 namespace FootballSystem.Passes;
 
+using System;
 using System.Collections.Generic;
 
 public class Subscription : Pass
 {
-		public HashSet<int> MatchIDs = new();
-		public HashSet<int> UsedMatches = new();
-		public int StartUnixTimestamp;
-		public int EndUnixTimestamp;
+    public HashSet<int> matchIds = new();
+    public HashSet<int> usedMatches = new();
+    public int startTimestamp;
+    public int endTimestamp;
 
-		public Subscription(HashSet<int> matchIds) => MatchIDs = matchIds;
+    public Subscription(HashSet<int> matchIds)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Subscription.create(matchCount={matchIds.Count})");
+        this.matchIds = matchIds;
+    }
 
-		public override bool CheckAccess(int matchId)
-		{
-				return MatchIDs.Contains(matchId) && !UsedMatches.Contains(matchId);
-		}
+    public override bool checkAccess(int matchId)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Subscription.checkAccess(matchId={matchId})");
+        return matchIds.Contains(matchId) && !usedMatches.Contains(matchId);
+    }
 
-		public override bool MarkUsed(int matchId)
-		{
-				if (!CheckAccess(matchId))
-				{
-						return false;
-				}
-				UsedMatches.Add(matchId);
-				return true;
-		}
+    public override bool markUsed(int matchId)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Subscription.markUsed(matchId={matchId})");
+        if (!checkAccess(matchId))
+        {
+            return false;
+        }
 
-		public override bool CheckRefundEligibility()
-		{
-				return !IsRefunded && UsedMatches.Count == 0;
-		}
+        usedMatches.Add(matchId);
+        return true;
+    }
+
+    public override bool checkRefundEligibility()
+    {
+        Console.WriteLine("[ВЫЗОВ] Subscription.checkRefundEligibility()");
+        return !isRefunded && usedMatches.Count == 0;
+    }
 }

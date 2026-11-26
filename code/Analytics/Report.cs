@@ -1,75 +1,69 @@
 namespace FootballSystem.Analytics;
 
-using FootballSystem.Passes;
 using FootballSystem.Events;
+using FootballSystem.Passes;
 
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
-public class Report
+public class Report : AnalyticsObserver
 {
-		public int EventID;
-		public double TotalRevenue;
-		public int TicketsSold;
-		public int AttendanceCount;
-		public int UpdatedAtUnix;
+    public int eventId;
+    public double totalRevenue;
+    public int ticketsSold;
+    public int attendanceCount;
+    public int updatedAt;
 
-		private List<Pass> _passes = new();
+    private List<Pass> passes = new();
 
-		public Report()
-		{
-		}
+    public Report()
+    {
+        Console.WriteLine("[ВЫЗОВ] Report.create()");
+    }
 
-		public Report(Event e, List<Pass> passes)
-		{
-				EventID = e.ID;
-				_passes = passes;
-		}
+    public Report(Event e, List<Pass> passes)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Report.create(eventId={e.getId()})");
+        this.eventId = e.getId();
+        this.passes = passes;
+    }
 
-		public void CalculateMetrics()
-		{
-				TotalRevenue = 0;
-				TicketsSold = 0;
-				AttendanceCount = 0;
+    public void update(int eventId, int ticketsSold, double revenue)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Report.update(eventId={eventId}, ticketsSold={ticketsSold}, revenue={revenue:F2})");
+        this.eventId = eventId;
+        this.ticketsSold = ticketsSold;
+        totalRevenue = revenue;
+        updatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+    }
 
-				foreach (Pass pass in _passes)
-				{
-						if (pass.IsRefunded)
-						{
-								continue;
-						}
+    public void calculateMetrics()
+    {
+        Console.WriteLine("[ВЫЗОВ] Report.calculateMetrics()");
+        attendanceCount = passes.Count(p =>
+            !p.isRefunded &&
+            ((p is Ticket ticket && ticket.used) ||
+             (p is Subscription subscription && subscription.usedMatches.Count > 0)));
+    }
 
-						TotalRevenue += pass.Price;
-						TicketsSold++;
+    public string toCsv()
+    {
+        Console.WriteLine("[ВЫЗОВ] Report.toCsv()");
+        return "EventID,TotalRevenue,TicketsSold,AttendanceCount,UpdatedAtUnix" + Environment.NewLine +
+            $"{eventId},{totalRevenue.ToString("F2", CultureInfo.InvariantCulture)},{ticketsSold},{attendanceCount},{updatedAt}";
+    }
 
-						if (pass is Ticket ticket && ticket.Used)
-						{
-								AttendanceCount++;
-						}
-						else if (pass is Subscription subscription && subscription.UsedMatches.Count > 0)
-						{
-								AttendanceCount++;
-						}
-				}
-
-				UpdatedAtUnix = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-		}
-
-		public string ToCsv()
-		{
-				return "EventID,TotalRevenue,TicketsSold,AttendanceCount,UpdatedAtUnix" + Environment.NewLine +
-						$"{EventID},{TotalRevenue.ToString("F2", CultureInfo.InvariantCulture)},{TicketsSold},{AttendanceCount},{UpdatedAtUnix}";
-		}
-
-		public override string ToString()
-		{
-				return "===== ANALYTICS REPORT =====" + Environment.NewLine +
-						$"Event ID:         {EventID}" + Environment.NewLine +
-						$"Total revenue:    {TotalRevenue:F2}" + Environment.NewLine +
-						$"Tickets sold:     {TicketsSold}" + Environment.NewLine +
-						$"Attendance:       {AttendanceCount}" + Environment.NewLine +
-						$"Updated at:       {DateTimeOffset.FromUnixTimeSeconds(UpdatedAtUnix):g}" + Environment.NewLine +
-						"============================";
-		}
+    public override string ToString()
+    {
+        Console.WriteLine("[ВЫЗОВ] Report.ToString()");
+        return "===== ANALYTICS REPORT =====" + Environment.NewLine +
+            $"Event ID:         {eventId}" + Environment.NewLine +
+            $"Total revenue:    {totalRevenue:F2}" + Environment.NewLine +
+            $"Tickets sold:     {ticketsSold}" + Environment.NewLine +
+            $"Attendance:       {attendanceCount}" + Environment.NewLine +
+            $"Updated at:       {DateTimeOffset.FromUnixTimeSeconds(updatedAt):g}" + Environment.NewLine +
+            "============================";
+    }
 }

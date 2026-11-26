@@ -1,18 +1,22 @@
 namespace FootballSystem.Events;
 
+using System;
+
 public class Seat
 {
-		public int ID;
-		public int Sector;
-		public int Row;
-		public int Column;
-		public double Price;
+    public int id;
+    public int sector;
+    public int row;
+    public int column;
+    public double price;
 
-		public Seat(int id, int sector, int row, int column, double price) {
-				ID = id;
-				Sector = sector;
-				Row = row;
-				Column = column;
-				Price = price;
-		}
+    public Seat(int id, int sector, int row, int column, double price)
+    {
+        Console.WriteLine($"[ВЫЗОВ] Seat.create(id={id}, price={price:F2})");
+        this.id = id;
+        this.sector = sector;
+        this.row = row;
+        this.column = column;
+        this.price = price;
+    }
 }

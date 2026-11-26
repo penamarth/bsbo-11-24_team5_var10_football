@@ -2,6 +2,7 @@
 using FootballSystem.Events;
 using FootballSystem.Banking;
 using FootballSystem.Passes;
+using FootballSystem.Turnstiles;
 
 using System;
 using System.Threading.Tasks;
@@ -12,10 +13,14 @@ class Program
 {
     static async Task Main(string[] args)
     {
-		EventStorage estorage = new();
-		PassStorage pstorage = new();
-		SberbankAdapter bank = new();
-		FTS fts = new(pstorage, estorage, bank);
-		await fts.Run();
+        Console.WriteLine("[ВЫЗОВ] Program.Main()");
+
+        EventRepository eventRepo = new();
+        PassRepository passRepo = new();
+        SberbankAdapter bank = new();
+        TurnstileAdapter turnstiles = new();
+
+        FTS fts = new(passRepo, eventRepo, bank, turnstiles);
+        await fts.run();
     }
 }
