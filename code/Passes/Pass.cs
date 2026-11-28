@@ -2,6 +2,8 @@ namespace FootballSystem.Passes;
 
 public abstract class Pass
 {
+		internal event Action<Pass>? UsageChanged;
+
 		public int ID;
 		public int SeatID;
 		public double Price;
@@ -14,4 +16,6 @@ public abstract class Pass
 		public abstract bool CheckAccess(int matchId);
 		public abstract bool MarkUsed(int matchId);
 		public abstract bool CheckRefundEligibility();
+
+		protected void NotifyUsageChanged() => UsageChanged?.Invoke(this);
 }

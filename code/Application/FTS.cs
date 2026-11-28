@@ -10,14 +10,13 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 
-public class FTS
+public class FTS : IDisposable
 {
 		private PassStorage _passStorage;
 		private EventStorage _eventStorage;
 		private Banking.IBankAdapter _bank;
-		private List<Report> _reports = new();
+		private readonly Dictionary<int, Report> _reports = new();
 		private Event? _analyticsEvent;
-		private List<Pass> _analyticsPasses = new();
 		private Report? _analyticsReport;
 
 		public FTS(PassStorage passStorage, EventStorage eventStorage, Banking.IBankAdapter bank)
@@ -25,7 +24,10 @@ public class FTS
 				_passStorage = passStorage;
 				_eventStorage = eventStorage;
 				_bank = bank;
+				_passStorage.PassChanged += RefreshReports;
 		}
+
+		public void Dispose() => _passStorage.PassChanged -= RefreshReports;
 
 		public async Task Run()
 		{
@@ -701,11 +703,7 @@ public class FTS
 		public List<Event> ManageAnalytics()
 		{
 				List<Event> events = _eventStorage.GetEvents()
-						.Where(e =>
-										{
-										HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
-										return _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds)).Count > 0;
-										})
+						.Where(e => GetEventPasses(e).Count > 0)
 				.ToList();
 
 				Console.Write("\x1b[2J\x1b[H");
@@ -738,11 +736,9 @@ public class FTS
 
 				_analyticsEvent = e;
 				_analyticsReport = null;
-				HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
-				_analyticsPasses = _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds));
 
 				Console.WriteLine($"Event: {e.Name}");
-				Console.WriteLine($"Tickets/subscriptions found: {_analyticsPasses.Count}");
+				Console.WriteLine($"Tickets/subscriptions found: {GetEventPasses(e).Count}");
 				return true;
 		}
 
@@ -754,15 +750,50 @@ public class FTS
 						return null;
 				}
 
-				Report report = new(_analyticsEvent, _analyticsPasses);
-				report.CalculateMetrics();
-
-				_reports.RemoveAll(r => r.EventID == report.EventID);
-				_reports.Add(report);
+				Report report = BuildReport(_analyticsEvent, GetEventPasses(_analyticsEvent));
 				_analyticsReport = report;
 
 				Console.WriteLine(report);
 				return report;
+		}
+
+		private List<Pass> GetEventPasses(Event e)
+		{
+				HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
+				return _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds));
+		}
+
+		private Report BuildReport(Event e, List<Pass> passes)
+		{
+				Report report = new(e, passes);
+				report.CalculateMetrics();
+				_reports[e.ID] = report;
+				return report;
+		}
+
+		private void RefreshReports(Pass changedPass)
+		{
+				foreach (int eventId in _reports.Keys.ToArray())
+				{
+						Event? e = _eventStorage.FindEventByID(eventId);
+						if (e == null)
+						{
+								continue;
+						}
+
+						HashSet<int> matchIds = e.Matches.Select(m => m.ID).ToHashSet();
+						if (!_passStorage.CoversAnyMatch(changedPass, matchIds))
+						{
+								continue;
+						}
+
+						List<Pass> passes = _passStorage.GetPassesWithFilter(p => _passStorage.CoversAnyMatch(p, matchIds));
+						Report report = BuildReport(e, passes);
+						if (_analyticsReport?.EventID == eventId)
+						{
+								_analyticsReport = report;
+						}
+				}
 		}
 
 		public string? ExportReport(ReportFormat format)
@@ -793,7 +824,7 @@ public class FTS
 
 		public Report? GetReport(int eventId)
 		{
-				return _reports.FirstOrDefault(r => r.EventID == eventId);
+				return _reports.GetValueOrDefault(eventId);
 		}
 
 		public List<Event> GetAvailableEvents()

@@ -15,7 +15,7 @@ class Program
 		EventStorage estorage = new();
 		PassStorage pstorage = new();
 		SberbankAdapter bank = new();
-		FTS fts = new(pstorage, estorage, bank);
+		using FTS fts = new(pstorage, estorage, bank);
 		await fts.Run();
     }
 }

@@ -23,6 +23,7 @@ public class Subscription : Pass
 						return false;
 				}
 				UsedMatches.Add(matchId);
+				NotifyUsageChanged();
 				return true;
 		}
 

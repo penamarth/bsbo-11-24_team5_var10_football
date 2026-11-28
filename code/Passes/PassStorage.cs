@@ -7,12 +7,16 @@ public class PassStorage
 {
 		private List<Pass> _passes = new();
 
+		public event Action<Pass>? PassChanged;
+
 		public PassStorage() {}
 
 		public void CreatePass(Pass pass)
 		{
 				pass.ID = _passes.Count + 1;
 				_passes.Add(pass);
+				pass.UsageChanged += NotifyPassChanged;
+				NotifyPassChanged(pass);
 		}
 
 		public bool CheckRefundEligibility(int passId)
@@ -31,9 +35,12 @@ public class PassStorage
 						return false;
 				}
 
-				pass.IsRefunded = true; 
+				pass.IsRefunded = true;
+				NotifyPassChanged(pass);
 				return true;
 		}
+
+		private void NotifyPassChanged(Pass pass) => PassChanged?.Invoke(pass);
 
 		public Pass? GetPassByID(int passId) 
 		{

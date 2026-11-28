@@ -22,6 +22,7 @@ public class Ticket : Pass
             return false;
         }
         Used = true;
+        NotifyUsageChanged();
         return true;
     }
 
