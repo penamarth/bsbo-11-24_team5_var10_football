@@ -10,11 +10,15 @@ public class PassRepository
 {
     private List<Pass> passes = new();
 
+    public event Action<Pass>? PassChanged;
+
     public void createPass(Pass pass)
     {
         ConsolePanes.log($"PassRepository.createPass(pass={pass.GetType().Name})");
         pass.id = passes.Count + 1;
         passes.Add(pass);
+        pass.UsageChanged += notifyPassChanged;
+        notifyPassChanged(pass);
     }
 
     public bool checkRefundEligibility(int passId)
@@ -34,7 +38,14 @@ public class PassRepository
         }
 
         pass.isRefunded = true;
+        notifyPassChanged(pass);
         return true;
+    }
+
+    private void notifyPassChanged(Pass pass)
+    {
+        ConsolePanes.log($"PassRepository.notifyPassChanged(passId={pass.id})");
+        PassChanged?.Invoke(pass);
     }
 
     public Pass? getPassById(int passId)

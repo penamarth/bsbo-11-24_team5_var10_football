@@ -44,10 +44,32 @@ public class Report : AnalyticsObserver
     public void calculateMetrics()
     {
         ConsolePanes.log("Report.calculateMetrics()");
-        attendanceCount = passes.Count(p =>
-            !p.isRefunded &&
-            ((p is Ticket ticket && ticket.used) ||
-             (p is Subscription subscription && subscription.usedMatches.Count > 0)));
+
+        totalRevenue = 0;
+        ticketsSold = 0;
+        attendanceCount = 0;
+
+        foreach (Pass pass in passes)
+        {
+            if (pass.isRefunded)
+            {
+                continue;
+            }
+
+            totalRevenue += pass.price;
+            ticketsSold++;
+
+            if (pass is Ticket ticket && ticket.used)
+            {
+                attendanceCount++;
+            }
+            else if (pass is Subscription subscription && subscription.usedMatches.Count > 0)
+            {
+                attendanceCount++;
+            }
+        }
+
+        updatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
     public string toCsv()

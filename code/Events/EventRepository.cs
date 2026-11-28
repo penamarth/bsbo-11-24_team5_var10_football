@@ -9,6 +9,7 @@ using System.Linq;
 public class EventRepository
 {
     private List<Event> events = new();
+    private List<StadiumMap> stadiumMaps = new();
     private Dictionary<(int MatchId, int SeatId), int> bookingDeadlines = new();
 
     public List<Event> getEvents()
@@ -29,6 +30,25 @@ public class EventRepository
         return events
             .Select(e => e.findMatchById(id))
             .FirstOrDefault(match => match != null);
+    }
+
+    public List<StadiumMap> getStadiumMaps()
+    {
+        ConsolePanes.log("EventRepository.getStadiumMaps()");
+        return stadiumMaps;
+    }
+
+    public StadiumMap? findStadiumMapById(int id)
+    {
+        ConsolePanes.log($"EventRepository.findStadiumMapById(id={id})");
+        return stadiumMaps.FirstOrDefault(map => map.id == id);
+    }
+
+    public void createStadiumMap(StadiumMap map)
+    {
+        ConsolePanes.log($"EventRepository.createStadiumMap(map={map.name})");
+        map.id = stadiumMaps.Select(m => m.id).DefaultIfEmpty(0).Max() + 1;
+        stadiumMaps.Add(map);
     }
 
     public void createEvent(Event e)

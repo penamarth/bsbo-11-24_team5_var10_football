@@ -23,7 +23,7 @@ class Program
         SberbankAdapter bank = new();
         TurnstileAdapter turnstiles = new();
 
-        FTS fts = new(passRepo, eventRepo, bank, turnstiles);
+        using FTS fts = new(passRepo, eventRepo, bank, turnstiles);
         await fts.run();
     }
 }
