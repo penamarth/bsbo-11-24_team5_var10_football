@@ -14,7 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-public class FTS : AnalyticsSubject, IDisposable
+public class FTS : AnalyticsSubject
 {
     private PassRepository passRepo;
     private EventRepository eventRepo;
@@ -37,11 +37,6 @@ public class FTS : AnalyticsSubject, IDisposable
         passRepo.PassChanged += refreshReports;
     }
 
-    public void Dispose()
-    {
-        ConsolePanes.log("FTS.dispose()");
-        passRepo.PassChanged -= refreshReports;
-    }
 
     public async Task run()
     {

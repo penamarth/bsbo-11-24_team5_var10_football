@@ -8,6 +8,7 @@ using System;
 using System.Threading.Tasks;
 
 namespace FootballSystem;
+
 using FootballSystem.UI;
 
 
@@ -23,7 +24,7 @@ class Program
         SberbankAdapter bank = new();
         TurnstileAdapter turnstiles = new();
 
-        using FTS fts = new(passRepo, eventRepo, bank, turnstiles);
+        FTS fts = new(passRepo, eventRepo, bank, turnstiles);
         await fts.run();
     }
 }
