@@ -1,4 +1,6 @@
 namespace FootballSystem.Passes;
+using FootballSystem.UI;
+
 
 using System;
 using System.Collections.Generic;
@@ -12,19 +14,19 @@ public class Subscription : Pass
 
     public Subscription(HashSet<int> matchIds)
     {
-        Console.WriteLine($"[ВЫЗОВ] Subscription.create(matchCount={matchIds.Count})");
+        ConsolePanes.log($"Subscription.create(matchCount={matchIds.Count})");
         this.matchIds = matchIds;
     }
 
     public override bool checkAccess(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] Subscription.checkAccess(matchId={matchId})");
+        ConsolePanes.log($"Subscription.checkAccess(matchId={matchId})");
         return matchIds.Contains(matchId) && !usedMatches.Contains(matchId);
     }
 
     public override bool markUsed(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] Subscription.markUsed(matchId={matchId})");
+        ConsolePanes.log($"Subscription.markUsed(matchId={matchId})");
         if (!checkAccess(matchId))
         {
             return false;
@@ -36,7 +38,7 @@ public class Subscription : Pass
 
     public override bool checkRefundEligibility()
     {
-        Console.WriteLine("[ВЫЗОВ] Subscription.checkRefundEligibility()");
+        ConsolePanes.log("Subscription.checkRefundEligibility()");
         return !isRefunded && usedMatches.Count == 0;
     }
 }

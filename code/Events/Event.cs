@@ -1,4 +1,6 @@
 namespace FootballSystem.Events;
+using FootballSystem.UI;
+
 
 using System;
 using System.Collections.Generic;
@@ -14,7 +16,7 @@ public class Event : EventComponent
 
     public Event(int id, string name, int startTimestamp, int endTimestamp)
     {
-        Console.WriteLine($"[ВЫЗОВ] Event.create(id={id}, name={name})");
+        ConsolePanes.log($"Event.create(id={id}, name={name})");
         this.id = id;
         this.name = name;
         this.startTimestamp = startTimestamp;
@@ -23,50 +25,50 @@ public class Event : EventComponent
 
     public int getId()
     {
-        Console.WriteLine("[ВЫЗОВ] Event.getId()");
+        ConsolePanes.log("Event.getId()");
         return id;
     }
 
     public string getName()
     {
-        Console.WriteLine("[ВЫЗОВ] Event.getName()");
+        ConsolePanes.log("Event.getName()");
         return name;
     }
 
     public int getStartTimestamp()
     {
-        Console.WriteLine("[ВЫЗОВ] Event.getStartTimestamp()");
+        ConsolePanes.log("Event.getStartTimestamp()");
         return startTimestamp;
     }
 
     public int getEndTimestamp()
     {
-        Console.WriteLine("[ВЫЗОВ] Event.getEndTimestamp()");
+        ConsolePanes.log("Event.getEndTimestamp()");
         return endTimestamp;
     }
 
     public void addChild(EventComponent c)
     {
-        Console.WriteLine($"[ВЫЗОВ] Event.addChild(c={c.getName()})");
+        ConsolePanes.log($"Event.addChild(c={c.getName()})");
         children.Add(c);
     }
 
     public bool removeChild(int id)
     {
-        Console.WriteLine($"[ВЫЗОВ] Event.removeChild(id={id})");
+        ConsolePanes.log($"Event.removeChild(id={id})");
         EventComponent? child = children.FirstOrDefault(c => c.getId() == id);
         return child != null && children.Remove(child);
     }
 
     public List<EventComponent> getChildren()
     {
-        Console.WriteLine("[ВЫЗОВ] Event.getChildren()");
+        ConsolePanes.log("Event.getChildren()");
         return children;
     }
 
     public Match? findMatchById(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] Event.findMatchById(matchId={matchId})");
+        ConsolePanes.log($"Event.findMatchById(matchId={matchId})");
 
         foreach (EventComponent child in children)
         {
@@ -90,7 +92,7 @@ public class Event : EventComponent
 
     public bool setSeatStatus(int matchId, int seatId, SeatStatus status)
     {
-        Console.WriteLine($"[ВЫЗОВ] Event.setSeatStatus(matchId={matchId}, seatId={seatId}, status={status})");
+        ConsolePanes.log($"Event.setSeatStatus(matchId={matchId}, seatId={seatId}, status={status})");
         Match? match = findMatchById(matchId);
         return match != null && match.setSeatStatus(seatId, status);
     }

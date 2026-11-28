@@ -1,4 +1,6 @@
 namespace FootballSystem.Events;
+using FootballSystem.UI;
+
 
 using System;
 using System.Collections.Generic;
@@ -13,12 +15,12 @@ public class StadiumMap : IPrototype<StadiumMap>
 
     public StadiumMap()
     {
-        Console.WriteLine("[ВЫЗОВ] StadiumMap.create()");
+        ConsolePanes.log("StadiumMap.create()");
     }
 
     public StadiumMap clone()
     {
-        Console.WriteLine("[ВЫЗОВ] StadiumMap.clone()");
+        ConsolePanes.log("StadiumMap.clone()");
         return new StadiumMap
         {
             name = name,

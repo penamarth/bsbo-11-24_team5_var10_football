@@ -7,8 +7,8 @@
 - Место с идентификатором `seatId` существует на схеме стадиона.
 
 **Постусловия:**
-- FTS вызвал `EventStorage.reserveSeat(matchId, seatId, timeout)`.
-- Если место было свободно, статус места в `match.takenSits` изменён на `SeatStatusBooked` до истечения `timeout` (модификация атрибута).
+- FTS вызвал `EventRepository.reserveSeat(matchId, seatId, timeoutSeconds)`.
+- Если место было свободно, статус места в `match.seatStatuses` изменён на `SeatStatusBooked` до истечения `timeoutSeconds` (модификация атрибута).
 - Покупателю показаны матч/абонемент, место и стоимость (`Seat.price`).
 - Если место уже занято, покупатель получает сообщение об этом и обновлённую схему мест.
-- Если оплата не поступила до истечения `timeout`, статус места возвращается в `SeatStatusFree`.
+- Если оплата не поступила до истечения `timeoutSeconds`, статус места возвращается в `SeatStatusFree`.

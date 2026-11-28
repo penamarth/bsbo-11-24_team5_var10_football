@@ -1,4 +1,6 @@
 namespace FootballSystem.Events;
+using FootballSystem.UI;
+
 
 using System;
 
@@ -12,7 +14,7 @@ public class Seat
 
     public Seat(int id, int sector, int row, int column, double price)
     {
-        Console.WriteLine($"[ВЫЗОВ] Seat.create(id={id}, price={price:F2})");
+        ConsolePanes.log($"Seat.create(id={id}, price={price:F2})");
         this.id = id;
         this.sector = sector;
         this.row = row;

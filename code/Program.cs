@@ -8,12 +8,15 @@ using System;
 using System.Threading.Tasks;
 
 namespace FootballSystem;
+using FootballSystem.UI;
+
 
 class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("[ВЫЗОВ] Program.Main()");
+        ConsolePanes.init();
+        ConsolePanes.log("Program.Main()");
 
         EventRepository eventRepo = new();
         PassRepository passRepo = new();

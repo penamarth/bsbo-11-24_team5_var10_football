@@ -1,4 +1,6 @@
 namespace FootballSystem.Events;
+using FootballSystem.UI;
+
 
 using System;
 using System.Collections.Generic;
@@ -11,19 +13,19 @@ public class EventRepository
 
     public List<Event> getEvents()
     {
-        Console.WriteLine("[ВЫЗОВ] EventRepository.getEvents()");
+        ConsolePanes.log("EventRepository.getEvents()");
         return events;
     }
 
     public Event? findEventById(int id)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.findEventById(id={id})");
+        ConsolePanes.log($"EventRepository.findEventById(id={id})");
         return events.FirstOrDefault(e => e.id == id);
     }
 
     public Match? findMatchById(int id)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.findMatchById(id={id})");
+        ConsolePanes.log($"EventRepository.findMatchById(id={id})");
         return events
             .Select(e => e.findMatchById(id))
             .FirstOrDefault(match => match != null);
@@ -31,14 +33,14 @@ public class EventRepository
 
     public void createEvent(Event e)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.createEvent(e={e.getName()})");
+        ConsolePanes.log($"EventRepository.createEvent(e={e.getName()})");
         e.id = events.Count + 1;
         events.Add(e);
     }
 
     public bool createMatch(int eventId, Match match)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.createMatch(eventId={eventId}, match={match.getName()})");
+        ConsolePanes.log($"EventRepository.createMatch(eventId={eventId}, match={match.getName()})");
         Event? targetEvent = findEventById(eventId);
         if (targetEvent == null)
         {
@@ -58,7 +60,7 @@ public class EventRepository
 
     public bool reserveSeat(int matchId, int seatId, int timeoutSeconds = 300)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.reserveSeat(matchId={matchId}, seatId={seatId})");
+        ConsolePanes.log($"EventRepository.reserveSeat(matchId={matchId}, seatId={seatId})");
         Match? match = findMatchById(matchId);
         if (match == null)
         {
@@ -87,7 +89,7 @@ public class EventRepository
 
     public bool checkBooking(int matchId, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.checkBooking(matchId={matchId}, seatId={seatId})");
+        ConsolePanes.log($"EventRepository.checkBooking(matchId={matchId}, seatId={seatId})");
         Match? match = findMatchById(matchId);
         if (match == null || match.seatStatuses.GetValueOrDefault(seatId, SeatStatus.Free) != SeatStatus.Booked)
         {
@@ -106,7 +108,7 @@ public class EventRepository
 
     public bool releaseSeat(int matchId, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.releaseSeat(matchId={matchId}, seatId={seatId})");
+        ConsolePanes.log($"EventRepository.releaseSeat(matchId={matchId}, seatId={seatId})");
         Match? match = findMatchById(matchId);
         if (match == null || match.seatStatuses.GetValueOrDefault(seatId, SeatStatus.Free) != SeatStatus.Booked)
         {
@@ -119,7 +121,7 @@ public class EventRepository
 
     public bool refundSeat(int matchId, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.refundSeat(matchId={matchId}, seatId={seatId})");
+        ConsolePanes.log($"EventRepository.refundSeat(matchId={matchId}, seatId={seatId})");
         Match? match = findMatchById(matchId);
         if (match == null || match.seatStatuses.GetValueOrDefault(seatId, SeatStatus.Free) != SeatStatus.Sold)
         {
@@ -132,7 +134,7 @@ public class EventRepository
 
     public bool updateEvent(int id, Event newEvent)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.updateEvent(id={id}, newEvent={newEvent.getName()})");
+        ConsolePanes.log($"EventRepository.updateEvent(id={id}, newEvent={newEvent.getName()})");
         Event? e = findEventById(id);
         if (e == null)
         {
@@ -150,7 +152,7 @@ public class EventRepository
 
     public bool updateMatch(int id, Match newMatch)
     {
-        Console.WriteLine($"[ВЫЗОВ] EventRepository.updateMatch(id={id}, newMatch={newMatch.getName()})");
+        ConsolePanes.log($"EventRepository.updateMatch(id={id}, newMatch={newMatch.getName()})");
         Match? match = findMatchById(id);
         if (match == null)
         {

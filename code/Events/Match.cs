@@ -1,4 +1,6 @@
 namespace FootballSystem.Events;
+using FootballSystem.UI;
+
 
 using System;
 using System.Collections.Generic;
@@ -15,7 +17,7 @@ public class Match : EventComponent
 
     public Match(int id, string name, double priceCoefficient, StadiumMap stadiumMap, int startTimestamp, int endTimestamp)
     {
-        Console.WriteLine($"[ВЫЗОВ] Match.create(id={id}, name={name})");
+        ConsolePanes.log($"Match.create(id={id}, name={name})");
         this.id = id;
         this.name = name;
         this.priceCoefficient = priceCoefficient;
@@ -26,31 +28,31 @@ public class Match : EventComponent
 
     public int getId()
     {
-        Console.WriteLine("[ВЫЗОВ] Match.getId()");
+        ConsolePanes.log("Match.getId()");
         return id;
     }
 
     public string getName()
     {
-        Console.WriteLine("[ВЫЗОВ] Match.getName()");
+        ConsolePanes.log("Match.getName()");
         return name;
     }
 
     public int getStartTimestamp()
     {
-        Console.WriteLine("[ВЫЗОВ] Match.getStartTimestamp()");
+        ConsolePanes.log("Match.getStartTimestamp()");
         return startTimestamp;
     }
 
     public int getEndTimestamp()
     {
-        Console.WriteLine("[ВЫЗОВ] Match.getEndTimestamp()");
+        ConsolePanes.log("Match.getEndTimestamp()");
         return endTimestamp;
     }
 
     public bool setSeatStatus(int seatId, SeatStatus status)
     {
-        Console.WriteLine($"[ВЫЗОВ] Match.setSeatStatus(seatId={seatId}, status={status})");
+        ConsolePanes.log($"Match.setSeatStatus(seatId={seatId}, status={status})");
         if (seatStatuses.TryGetValue(seatId, out SeatStatus current) && current == status)
         {
             return false;

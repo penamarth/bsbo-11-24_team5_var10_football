@@ -1,4 +1,6 @@
 namespace FootballSystem.Passes;
+using FootballSystem.UI;
+
 
 using System;
 
@@ -9,20 +11,20 @@ public class Ticket : Pass
 
     public Ticket(int matchId, double price)
     {
-        Console.WriteLine($"[ВЫЗОВ] Ticket.create(matchId={matchId}, price={price:F2})");
+        ConsolePanes.log($"Ticket.create(matchId={matchId}, price={price:F2})");
         this.matchId = matchId;
         this.price = price;
     }
 
     public override bool checkAccess(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] Ticket.checkAccess(matchId={matchId})");
+        ConsolePanes.log($"Ticket.checkAccess(matchId={matchId})");
         return !used && matchId == this.matchId;
     }
 
     public override bool markUsed(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] Ticket.markUsed(matchId={matchId})");
+        ConsolePanes.log($"Ticket.markUsed(matchId={matchId})");
         if (matchId != this.matchId || used)
         {
             return false;
@@ -34,7 +36,7 @@ public class Ticket : Pass
 
     public override bool checkRefundEligibility()
     {
-        Console.WriteLine("[ВЫЗОВ] Ticket.checkRefundEligibility()");
+        ConsolePanes.log("Ticket.checkRefundEligibility()");
         return !isRefunded && !used;
     }
 }

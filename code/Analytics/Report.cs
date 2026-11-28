@@ -1,4 +1,6 @@
 namespace FootballSystem.Analytics;
+using FootballSystem.UI;
+
 
 using FootballSystem.Events;
 using FootballSystem.Passes;
@@ -20,19 +22,19 @@ public class Report : AnalyticsObserver
 
     public Report()
     {
-        Console.WriteLine("[ВЫЗОВ] Report.create()");
+        ConsolePanes.log("Report.create()");
     }
 
     public Report(Event e, List<Pass> passes)
     {
-        Console.WriteLine($"[ВЫЗОВ] Report.create(eventId={e.getId()})");
+        ConsolePanes.log($"Report.create(eventId={e.getId()})");
         this.eventId = e.getId();
         this.passes = passes;
     }
 
     public void update(int eventId, int ticketsSold, double revenue)
     {
-        Console.WriteLine($"[ВЫЗОВ] Report.update(eventId={eventId}, ticketsSold={ticketsSold}, revenue={revenue:F2})");
+        ConsolePanes.log($"Report.update(eventId={eventId}, ticketsSold={ticketsSold}, revenue={revenue:F2})");
         this.eventId = eventId;
         this.ticketsSold = ticketsSold;
         totalRevenue = revenue;
@@ -41,7 +43,7 @@ public class Report : AnalyticsObserver
 
     public void calculateMetrics()
     {
-        Console.WriteLine("[ВЫЗОВ] Report.calculateMetrics()");
+        ConsolePanes.log("Report.calculateMetrics()");
         attendanceCount = passes.Count(p =>
             !p.isRefunded &&
             ((p is Ticket ticket && ticket.used) ||
@@ -50,14 +52,14 @@ public class Report : AnalyticsObserver
 
     public string toCsv()
     {
-        Console.WriteLine("[ВЫЗОВ] Report.toCsv()");
+        ConsolePanes.log("Report.toCsv()");
         return "EventID,TotalRevenue,TicketsSold,AttendanceCount,UpdatedAtUnix" + Environment.NewLine +
             $"{eventId},{totalRevenue.ToString("F2", CultureInfo.InvariantCulture)},{ticketsSold},{attendanceCount},{updatedAt}";
     }
 
     public override string ToString()
     {
-        Console.WriteLine("[ВЫЗОВ] Report.ToString()");
+        ConsolePanes.log("Report.ToString()");
         return "===== ANALYTICS REPORT =====" + Environment.NewLine +
             $"Event ID:         {eventId}" + Environment.NewLine +
             $"Total revenue:    {totalRevenue:F2}" + Environment.NewLine +

@@ -1,4 +1,6 @@
 namespace FootballSystem.Application;
+using FootballSystem.UI;
+
 
 using FootballSystem.Analytics;
 using FootballSystem.Banking;
@@ -26,7 +28,7 @@ public class FTS : AnalyticsSubject
 
     public FTS(PassRepository passRepo, EventRepository eventRepo, IBankAdapter bank, ITurnstileAdapter turnstiles)
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.create()");
+        ConsolePanes.log("FTS.create()");
         this.passRepo = passRepo;
         this.eventRepo = eventRepo;
         this.bank = bank;
@@ -35,34 +37,12 @@ public class FTS : AnalyticsSubject
 
     public async Task run()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.run()");
-
-        passRepo.createPass(new Ticket(0, 100));
-
-        StadiumMap map = new();
-        map.seats = new List<Seat>
-        {
-            new Seat(1, 1, 1, 1, 1000),
-            new Seat(2, 2, 1, 1, 2000)
-        };
-
-        int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        int nextWeek = (int)DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeSeconds();
-
-        Event createdEvent = new Event(1, "Event", now, nextWeek);
-        eventRepo.createEvent(createdEvent);
-
-        if (createdEvent != null)
-        {
-            Match match = new Match(0, "Match", 1.5, map.clone(), now, nextWeek);
-            eventRepo.createMatch(createdEvent.id, match);
-            match.setSeatStatus(2, SeatStatus.Booked);
-        }
+        ConsolePanes.log("FTS.run()");
 
         string msg = "1-5";
         for (;;)
         {
-            Console.Write("\x1b[2J\x1b[H");
+            ConsolePanes.clearMain();
 
             Console.WriteLine("1. Use a ticket");
             Console.WriteLine("2. Buy a ticket");
@@ -77,6 +57,7 @@ public class FTS : AnalyticsSubject
             switch (ans)
             {
                 case "1":
+                    await startUseTicket();
                     break;
                 case "2":
                     await startPurchase();
@@ -88,6 +69,7 @@ public class FTS : AnalyticsSubject
                     runAnalytics();
                     break;
                 case "5":
+                    manageEvents();
                     break;
                 default:
                     msg = "Only digits between 1-5";
@@ -96,9 +78,112 @@ public class FTS : AnalyticsSubject
         }
     }
 
+    public async Task startUseTicket()
+    {
+        ConsolePanes.log("FTS.startUseTicket()");
+
+        Match? match = selectEntryMatch();
+        if (match == null) return;
+
+        int? passId = requestScan();
+        if (passId == null) return;
+
+        Pass? pass = passRepo.getPassById(passId.Value);
+        if (pass == null)
+        {
+            Console.WriteLine("Pass not found.");
+            waitForEnter();
+            return;
+        }
+
+        if (pass.isRefunded || !pass.checkAccess(match.getId()))
+        {
+            Console.WriteLine("Access denied: the pass is refunded, already used, or not valid for this match.");
+            waitForEnter();
+            return;
+        }
+
+        Seat? seat = match.stadiumMap.seats.FirstOrDefault(s => s.id == pass.seatId);
+        if (seat == null)
+        {
+            Console.WriteLine("Seat not found on the stadium map.");
+            waitForEnter();
+            return;
+        }
+
+        Console.WriteLine($"Pass ID:  {pass.id}");
+        Console.WriteLine($"Match:    {match.getName()} ({formatDate(match.getStartTimestamp())})");
+        Console.WriteLine($"Seat:     {seat.id} (sector {seat.sector}, row {seat.row}, place {seat.column})");
+
+        int turnstileId = readInt("Turnstile ID", 1);
+        if (!unlockTurnstile(turnstileId))
+        {
+            Console.WriteLine("Failed to unlock the turnstile.");
+            waitForEnter();
+            return;
+        }
+
+        Console.Write("Press Enter after passing through...");
+        Console.ReadLine();
+
+        if (!pass.markUsed(match.getId()))
+        {
+            lockTurnstile(turnstileId);
+            Console.WriteLine("Failed to mark the pass as used.");
+            waitForEnter();
+            return;
+        }
+
+        lockTurnstile(turnstileId);
+        Console.WriteLine("Access granted.");
+        waitForEnter();
+    }
+
+    private Match? selectEntryMatch()
+    {
+        ConsolePanes.log("FTS.selectEntryMatch()");
+
+        List<Match> matches = eventRepo.getEvents().SelectMany(e => e.getChildren().OfType<Match>()).ToList();
+        ConsolePanes.clearMain();
+
+        if (matches.Count == 0)
+        {
+            Console.WriteLine("No matches are available.");
+            waitForEnter();
+            return null;
+        }
+
+        Console.WriteLine("===== MATCHES =====");
+        foreach (Match m in matches)
+        {
+            Console.WriteLine($"{m.getId()}. {m.getName()} ({formatDate(m.getStartTimestamp())})");
+        }
+        Console.WriteLine("===================");
+
+        Console.Write("Select a match ID (or press Enter to cancel): ");
+        string? input = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(input)) return null;
+
+        if (!int.TryParse(input, out int matchId))
+        {
+            Console.WriteLine("Invalid match ID.");
+            waitForEnter();
+            return null;
+        }
+
+        Match? match = eventRepo.findMatchById(matchId);
+        if (match == null)
+        {
+            Console.WriteLine("Match not found.");
+            waitForEnter();
+        }
+
+        return match;
+    }
+
     public async Task startPurchase()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.startPurchase()");
+        ConsolePanes.log("FTS.startPurchase()");
 
         List<Event> events = getAvailableEvents();
         if (events.Count == 0)
@@ -114,31 +199,26 @@ public class FTS : AnalyticsSubject
         bool? isSubscription = requestPurchaseType();
         if (isSubscription == null) return;
 
-        List<Match> seasonMatches;
-        Match? match;
+        PurchaseStrategy purchaseStrategy = isSubscription.Value
+            ? new SubscriptionPurchaseStrategy()
+            : new TicketPurchaseStrategy();
 
-        if (isSubscription.Value)
-        {
-            int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            seasonMatches = ev.getChildren().OfType<Match>()
-                .Where(m => m.getEndTimestamp() > now)
-                .ToList();
-
-            if (seasonMatches.Count == 0)
-            {
-                Console.WriteLine("No matches left in this season.");
-                pause();
-                return;
-            }
-
-            match = seasonMatches.First();
-        }
-        else
+        Match? match = null;
+        if (purchaseStrategy.needsMatchSelection())
         {
             match = selectMatch(ev);
             if (match == null) return;
-            seasonMatches = new List<Match> { match };
         }
+
+        List<Match> seasonMatches = purchaseStrategy.getMatches(ev, match);
+        if (seasonMatches.Count == 0)
+        {
+            Console.WriteLine("No matches left in this season.");
+            pause();
+            return;
+        }
+
+        match ??= seasonMatches.First();
 
         StadiumMap? map = getSeatMap(match.getId());
         if (map == null)
@@ -148,9 +228,7 @@ public class FTS : AnalyticsSubject
             return;
         }
 
-        string seatMapTitle = isSubscription.Value
-            ? $"subscription for {ev.getName()}"
-            : match.getName();
+        string seatMapTitle = purchaseStrategy.getTitle(ev, match);
 
         int? seatId;
         for (;;)
@@ -170,7 +248,7 @@ public class FTS : AnalyticsSubject
             return;
         }
 
-        double price = calculatePrice(seat, seasonMatches);
+        double price = purchaseStrategy.calculatePrice(seat, seasonMatches);
 
         if (!showPurchaseDetails(ev, match, seat, price, isSubscription.Value, seasonMatches.Count))
         {
@@ -187,9 +265,7 @@ public class FTS : AnalyticsSubject
             return;
         }
 
-        string description = isSubscription.Value
-            ? $"FTS subscription: {ev.getName()}, seat {seat.id}"
-            : $"FTS ticket: {ev.getName()} / {match.getName()}, seat {seat.id}";
+        string description = purchaseStrategy.getDescription(ev, match, seat);
 
         string? credentials = null;
         while (credentials == null)
@@ -215,9 +291,7 @@ public class FTS : AnalyticsSubject
             }
         }
 
-        Pass pass = isSubscription.Value
-            ? buildSubscription(ev, seasonMatches)
-            : new Ticket(match.getId(), price);
+        Pass pass = purchaseStrategy.createPass(ev, seasonMatches, seat, price);
 
         pass.seatId = seat.id;
         pass.price = price;
@@ -241,11 +315,11 @@ public class FTS : AnalyticsSubject
 
     public Event? selectEvent(List<Event> events)
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.selectEvent(events)");
+        ConsolePanes.log("FTS.selectEvent(events)");
 
         for (;;)
         {
-            Console.Write("\x1b[2J\x1b[H");
+            ConsolePanes.clearMain();
             Console.WriteLine("===== EVENTS OPEN FOR SALE =====");
             for (int i = 0; i < events.Count; i++)
             {
@@ -268,7 +342,7 @@ public class FTS : AnalyticsSubject
 
     public Match? selectMatch(Event ev)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.selectMatch(eventId={ev.getId()})");
+        ConsolePanes.log($"FTS.selectMatch(eventId={ev.getId()})");
 
         int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         List<Match> openMatches = ev.getChildren().OfType<Match>()
@@ -284,7 +358,7 @@ public class FTS : AnalyticsSubject
 
         for (;;)
         {
-            Console.Write("\x1b[2J\x1b[H");
+            ConsolePanes.clearMain();
             Console.WriteLine($"===== MATCHES: {ev.getName()} =====");
             for (int i = 0; i < openMatches.Count; i++)
             {
@@ -307,11 +381,11 @@ public class FTS : AnalyticsSubject
 
     public int? selectSeat(string title, StadiumMap map, Match match)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.selectSeat(title={title}, matchId={match.getId()})");
+        ConsolePanes.log($"FTS.selectSeat(title={title}, matchId={match.getId()})");
 
         for (;;)
         {
-            Console.Write("\x1b[2J\x1b[H");
+            ConsolePanes.clearMain();
             Console.WriteLine($"===== SEAT MAP: {map.name} ({title}) =====");
             foreach (Seat s in map.seats)
             {
@@ -341,8 +415,9 @@ public class FTS : AnalyticsSubject
 
     public bool? requestPurchaseType()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.requestPurchaseType()");
+        ConsolePanes.log("FTS.requestPurchaseType()");
 
+        ConsolePanes.clearMain();
         Console.WriteLine("What do you wish to buy?");
         Console.WriteLine("1. A ticket for a match");
         Console.WriteLine("2. A subscription for the season");
@@ -361,9 +436,9 @@ public class FTS : AnalyticsSubject
 
     public bool showPurchaseDetails(Event ev, Match match, Seat seat, double price, bool isSubscription, int matchCount)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.showPurchaseDetails(price={price:F2}, isSubscription={isSubscription})");
+        ConsolePanes.log($"FTS.showPurchaseDetails(price={price:F2}, isSubscription={isSubscription})");
 
-        Console.Write("\x1b[2J\x1b[H");
+        ConsolePanes.clearMain();
         Console.WriteLine("===== PURCHASE DETAILS =====");
         Console.WriteLine($"Event:          {ev.getName()}");
         Console.WriteLine(isSubscription
@@ -378,7 +453,7 @@ public class FTS : AnalyticsSubject
 
     public string? requestEmail()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.requestEmail()");
+        ConsolePanes.log("FTS.requestEmail()");
 
         for (;;)
         {
@@ -395,7 +470,7 @@ public class FTS : AnalyticsSubject
 
     public async Task<string?> payByCard(string description, double amount)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.payByCard(description={description}, amount={amount:F2})");
+        ConsolePanes.log($"FTS.payByCard(description={description}, amount={amount:F2})");
 
         string? url;
         try
@@ -414,7 +489,7 @@ public class FTS : AnalyticsSubject
             return null;
         }
 
-        Console.WriteLine("Complete the payment on the bank page (3-D Secure):");
+        Console.WriteLine("Complete the payment on the bank page:");
         Console.WriteLine(url);
         string status = await bank.confirmPurchase(url);
 
@@ -429,31 +504,22 @@ public class FTS : AnalyticsSubject
 
     public async Task sendTicketEmail(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.sendTicketEmail(passId={pass.id})");
+        ConsolePanes.log($"FTS.sendTicketEmail(passId={pass.id})");
         string text = purchaseText(pass) + "\n" + receiptText(pass);
         await sendEmail(pass.email, text);
     }
 
     public void showPurchaseConfirmation(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.showPurchaseConfirmation(passId={pass.id})");
+        ConsolePanes.log($"FTS.showPurchaseConfirmation(passId={pass.id})");
         Console.WriteLine("===== PURCHASE CONFIRMED =====");
         Console.WriteLine(purchaseText(pass));
         Console.WriteLine("==============================");
     }
 
-    private Subscription buildSubscription(Event ev, List<Match> seasonMatches)
-    {
-        Console.WriteLine($"[ВЫЗОВ] FTS.buildSubscription(eventId={ev.getId()})");
-        Subscription subscription = new(seasonMatches.Select(m => m.getId()).ToHashSet());
-        subscription.startTimestamp = ev.getStartTimestamp();
-        subscription.endTimestamp = ev.getEndTimestamp();
-        return subscription;
-    }
-
     private bool reserveSeats(List<Match> matches, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.reserveSeats(seatId={seatId})");
+        ConsolePanes.log($"FTS.reserveSeats(seatId={seatId})");
         foreach (Match match in matches)
         {
             if (!eventRepo.reserveSeat(match.getId(), seatId, BookingTimeoutSeconds))
@@ -466,7 +532,7 @@ public class FTS : AnalyticsSubject
 
     private void releaseSeats(List<Match> matches, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.releaseSeats(seatId={seatId})");
+        ConsolePanes.log($"FTS.releaseSeats(seatId={seatId})");
         foreach (Match match in matches)
         {
             eventRepo.releaseSeat(match.getId(), seatId);
@@ -475,7 +541,7 @@ public class FTS : AnalyticsSubject
 
     private bool checkBooking(List<Match> matches, int seatId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.checkBooking(seatId={seatId})");
+        ConsolePanes.log($"FTS.checkBooking(seatId={seatId})");
         foreach (Match match in matches)
         {
             if (!eventRepo.checkBooking(match.getId(), seatId))
@@ -486,28 +552,22 @@ public class FTS : AnalyticsSubject
         return true;
     }
 
-    private static double calculatePrice(Seat seat, List<Match> matches)
-    {
-        Console.WriteLine($"[ВЫЗОВ] FTS.calculatePrice(seatId={seat.id})");
-        return matches.Sum(m => seat.price * m.priceCoefficient);
-    }
-
     private static string transactionId(string url)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.transactionId(url={url})");
+        ConsolePanes.log($"FTS.transactionId(url={url})");
         string id = url.TrimEnd('/').Split('/').Last();
         return string.IsNullOrEmpty(id) ? url : id;
     }
 
     private static string generateQRCode(int passId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.generateQRCode(passId={passId})");
+        ConsolePanes.log($"FTS.generateQRCode(passId={passId})");
         return $"FTS-{passId}-{Guid.NewGuid():N}";
     }
 
     private static string purchaseText(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.purchaseText(passId={pass.id})");
+        ConsolePanes.log($"FTS.purchaseText(passId={pass.id})");
         string text = "Electronic pass\n" +
             $"Pass ID:    {pass.id}\n" +
             $"Type:       {pass.GetType().Name}\n" +
@@ -523,7 +583,7 @@ public class FTS : AnalyticsSubject
 
     private static string receiptText(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.receiptText(passId={pass.id})");
+        ConsolePanes.log($"FTS.receiptText(passId={pass.id})");
         return "E-RECEIPT\n" +
             $"Pass ID:         {pass.id}\n" +
             $"Paid:            {pass.price:F2}\n" +
@@ -532,7 +592,7 @@ public class FTS : AnalyticsSubject
 
     private static bool isValidEmail(string email)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.isValidEmail(email={email})");
+        ConsolePanes.log($"FTS.isValidEmail(email={email})");
         int at = email.IndexOf('@');
         return at > 0
             && email.IndexOf('@', at + 1) == -1
@@ -542,20 +602,20 @@ public class FTS : AnalyticsSubject
 
     private static string formatDate(int unixTimestamp)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.formatDate(timestamp={unixTimestamp})");
+        ConsolePanes.log($"FTS.formatDate(timestamp={unixTimestamp})");
         return DateTimeOffset.FromUnixTimeSeconds(unixTimestamp).ToString("dd.MM.yyyy HH:mm");
     }
 
     private static void pause()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.pause()");
+        ConsolePanes.log("FTS.pause()");
         Console.WriteLine("Press Enter to continue...");
         Console.ReadLine();
     }
 
     public async Task startRefund()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.startRefund()");
+        ConsolePanes.log("FTS.startRefund()");
 
         int? passId = requestScan();
         if (passId == null) return;
@@ -605,17 +665,10 @@ public class FTS : AnalyticsSubject
         if (!passRepo.refund(pass.id))
             Console.WriteLine("Warning: this pass was already marked as refunded.");
 
-        if (pass is Ticket ticket)
-        {
-            eventRepo.refundSeat(ticket.matchId, ticket.seatId);
-        }
-        else if (pass is Subscription subscription)
-        {
-            foreach (int id in subscription.matchIds)
-            {
-                eventRepo.refundSeat(id, subscription.seatId);
-            }
-        }
+        RefundStrategy refundStrategy = pass is Subscription
+            ? new SubscriptionRefundStrategy()
+            : new TicketRefundStrategy();
+        refundStrategy.releaseSeats(pass, eventRepo);
 
         await giveReceipt(pass);
         waitForEnter();
@@ -623,9 +676,9 @@ public class FTS : AnalyticsSubject
 
     public bool showRefundDetails(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.showRefundDetails(passId={pass.id})");
+        ConsolePanes.log($"FTS.showRefundDetails(passId={pass.id})");
 
-        Console.Write("\x1b[2J\x1b[H");
+        ConsolePanes.clearMain();
         Console.WriteLine("===== REFUND DETAILS =====");
         Console.WriteLine($"Pass ID:          {pass.id}");
         Console.WriteLine($"Type:             {pass.GetType().Name}");
@@ -640,7 +693,7 @@ public class FTS : AnalyticsSubject
 
     public async Task<bool> refundToCard(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.refundToCard(passId={pass.id})");
+        ConsolePanes.log($"FTS.refundToCard(passId={pass.id})");
 
         if (string.IsNullOrEmpty(pass.paymentCredentials))
         {
@@ -655,7 +708,7 @@ public class FTS : AnalyticsSubject
 
     public async Task<bool> refundWithCash(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.refundWithCash(passId={pass.id})");
+        ConsolePanes.log($"FTS.refundWithCash(passId={pass.id})");
 
         Console.WriteLine($"Please hand {pass.price:F2} to the customer.");
         await Task.Delay(500);
@@ -665,9 +718,9 @@ public class FTS : AnalyticsSubject
 
     public int? requestScan()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.requestScan()");
+        ConsolePanes.log("FTS.requestScan()");
 
-        Console.Write("\x1b[2J\x1b[H");
+        ConsolePanes.clearMain();
         Console.Write("Scan your pass (enter pass ID, or press Enter to cancel): ");
         string? input = Console.ReadLine();
 
@@ -687,16 +740,15 @@ public class FTS : AnalyticsSubject
 
     public async Task giveReceipt(Pass pass)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.giveReceipt(passId={pass.id})");
+        ConsolePanes.log($"FTS.giveReceipt(passId={pass.id})");
 
-        string text = "Ticket for a refund\n" +
-            $"Refunded: {pass.price:F2}";
+        string text = "Ticket for a refund\n" + $"Refunded: {pass.price:F2}";
         await Task.WhenAll(sendEmail(pass.email, text), printReceipt(text));
     }
 
     private async Task<bool> printReceipt(string text)
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.printReceipt()");
+        ConsolePanes.log("FTS.printReceipt()");
 
         Console.WriteLine("Printing a receipt...");
         await Task.Delay(2000);
@@ -708,7 +760,7 @@ public class FTS : AnalyticsSubject
 
     private async Task<bool> sendEmail(string email, string text)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.sendEmail(email={email})");
+        ConsolePanes.log($"FTS.sendEmail(email={email})");
 
         Console.WriteLine($"Sending an email to {email}...");
         await Task.Delay(1000);
@@ -720,7 +772,7 @@ public class FTS : AnalyticsSubject
 
     public void runAnalytics()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.runAnalytics()");
+        ConsolePanes.log("FTS.runAnalytics()");
 
         List<Event> events = manageAnalytics();
         if (events.Count == 0)
@@ -773,7 +825,7 @@ public class FTS : AnalyticsSubject
 
     public List<Event> manageAnalytics()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.manageAnalytics()");
+        ConsolePanes.log("FTS.manageAnalytics()");
 
         List<Event> events = eventRepo.getEvents()
             .Where(e =>
@@ -783,7 +835,7 @@ public class FTS : AnalyticsSubject
             })
             .ToList();
 
-        Console.Write("\x1b[2J\x1b[H");
+        ConsolePanes.clearMain();
         Console.WriteLine("===== ANALYTICS: EVENTS =====");
 
         if (events.Count == 0)
@@ -804,7 +856,7 @@ public class FTS : AnalyticsSubject
 
     public bool selectEvent(int eventId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.selectEvent(eventId={eventId})");
+        ConsolePanes.log($"FTS.selectEvent(eventId={eventId})");
 
         Event? e = eventRepo.findEventById(eventId);
         if (e == null)
@@ -825,7 +877,7 @@ public class FTS : AnalyticsSubject
 
     public Report? calculateMetrics()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.calculateMetrics()");
+        ConsolePanes.log("FTS.calculateMetrics()");
 
         if (analyticsEvent == null)
         {
@@ -856,7 +908,7 @@ public class FTS : AnalyticsSubject
 
     public string? exportReport(ReportFormat format)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.exportReport(format={format})");
+        ConsolePanes.log($"FTS.exportReport(format={format})");
 
         if (analyticsReport == null)
         {
@@ -878,58 +930,413 @@ public class FTS : AnalyticsSubject
 
     private static void waitForEnter()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.waitForEnter()");
+        ConsolePanes.log("FTS.waitForEnter()");
         Console.Write("Press Enter to return to the menu...");
         Console.ReadLine();
     }
 
     public Report? getReport(int eventId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.getReport(eventId={eventId})");
+        ConsolePanes.log($"FTS.getReport(eventId={eventId})");
         return reports.OfType<Report>().FirstOrDefault(r => r.eventId == eventId);
     }
 
     public List<Event> getAvailableEvents()
     {
-        Console.WriteLine("[ВЫЗОВ] FTS.getAvailableEvents()");
+        ConsolePanes.log("FTS.getAvailableEvents()");
         int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return eventRepo.getEvents().Where(e => e.getEndTimestamp() > now).ToList();
     }
 
     public StadiumMap? getSeatMap(int matchId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.getSeatMap(matchId={matchId})");
+        ConsolePanes.log($"FTS.getSeatMap(matchId={matchId})");
         Match? match = eventRepo.findMatchById(matchId);
         return match?.stadiumMap.clone();
     }
 
     public bool unlockTurnstile(int turnstileId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.unlockTurnstile(turnstileId={turnstileId})");
+        ConsolePanes.log($"FTS.unlockTurnstile(turnstileId={turnstileId})");
         return turnstiles.unlock(turnstileId);
     }
 
     public bool lockTurnstile(int turnstileId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.lockTurnstile(turnstileId={turnstileId})");
+        ConsolePanes.log($"FTS.lockTurnstile(turnstileId={turnstileId})");
         return turnstiles.@lock(turnstileId);
+    }
+
+    public void manageEvents()
+    {
+        ConsolePanes.log("FTS.manageEvents()");
+
+        string msg = "";
+        for (;;)
+        {
+            ConsolePanes.clearMain();
+            if (msg.Length > 0)
+            {
+                Console.WriteLine(msg);
+                msg = "";
+            }
+
+            Console.WriteLine("===== EVENT MANAGEMENT =====");
+            Console.WriteLine("1. Show events and matches");
+            Console.WriteLine("2. Create an event");
+            Console.WriteLine("3. Create a match");
+            Console.WriteLine("4. Update an event");
+            Console.WriteLine("5. Update a match");
+            Console.WriteLine("6. Change a seat status");
+            Console.WriteLine("0. Back");
+            Console.Write("> ");
+
+            switch (Console.ReadLine())
+            {
+                case "1":
+                    showEvents();
+                    break;
+                case "2":
+                    createEvent();
+                    break;
+                case "3":
+                    createMatch();
+                    break;
+                case "4":
+                    updateEvent();
+                    break;
+                case "5":
+                    updateMatch();
+                    break;
+                case "6":
+                    updateSeat();
+                    break;
+                case "0":
+                    return;
+                default:
+                    msg = "Only digits between 0-6";
+                    break;
+            }
+        }
+    }
+
+    public void showEvents()
+    {
+        ConsolePanes.log("FTS.showEvents()");
+        ConsolePanes.clearMain();
+
+        List<Event> events = eventRepo.getEvents();
+        if (events.Count == 0)
+        {
+            Console.WriteLine("No events are available.");
+        }
+
+        foreach (Event e in events)
+        {
+            Console.WriteLine($"Event {e.getId()}: {e.getName()} ({formatDate(e.getStartTimestamp())} - {formatDate(e.getEndTimestamp())})");
+            foreach (EventComponent child in e.getChildren())
+            {
+                if (child is Match match)
+                {
+                    Console.WriteLine($"  Match {match.getId()}: {match.getName()} ({formatDate(match.getStartTimestamp())})");
+                }
+            }
+        }
+
+        waitForEnter();
+    }
+
+    public Event? createEvent()
+    {
+        ConsolePanes.log("FTS.createEvent()");
+        ConsolePanes.clearMain();
+
+        Console.Write("Event name: ");
+        string? name = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        int start = readTimestamp("Start (yyyy-MM-dd HH:mm)", now);
+        int end = readTimestamp("End (yyyy-MM-dd HH:mm)", start + 7 * 24 * 3600);
+        if (end <= start)
+        {
+            Console.WriteLine("The end must be after the start.");
+            waitForEnter();
+            return null;
+        }
+
+        Event created = new(0, name.Trim(), start, end);
+        eventRepo.createEvent(created);
+        Console.WriteLine($"Event created with ID {created.getId()}.");
+        waitForEnter();
+        return created;
+    }
+
+    public Match? createMatch()
+    {
+        ConsolePanes.log("FTS.createMatch()");
+        ConsolePanes.clearMain();
+
+        List<Event> events = eventRepo.getEvents();
+        if (events.Count == 0)
+        {
+            Console.WriteLine("Create an event first.");
+            waitForEnter();
+            return null;
+        }
+
+        foreach (Event e in events)
+        {
+            Console.WriteLine($"{e.getId()}. {e.getName()}");
+        }
+
+        Event? ev = eventRepo.findEventById(readInt("Event ID", events[0].getId()));
+        if (ev == null)
+        {
+            Console.WriteLine("Event not found.");
+            waitForEnter();
+            return null;
+        }
+
+        Console.Write("Match name: ");
+        string? name = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        double coefficient = readDouble("Price coefficient", 1.0);
+        int now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        int start = readTimestamp("Start (yyyy-MM-dd HH:mm)", now);
+        int end = readTimestamp("End (yyyy-MM-dd HH:mm)", start + 3 * 3600);
+        if (end <= start)
+        {
+            Console.WriteLine("The end must be after the start.");
+            waitForEnter();
+            return null;
+        }
+
+        int seatCount = Math.Max(1, readInt("Number of seats", 2));
+        double basePrice = readDouble("Base seat price", 1000);
+
+        StadiumMap map = new();
+        map.name = $"{name.Trim()} map";
+        for (int i = 1; i <= seatCount; i++)
+        {
+            map.seats.Add(new Seat(i, 1, 1, i, basePrice));
+        }
+        map.turnstiles.Add(1);
+
+        Match created = new(0, name.Trim(), coefficient, map, start, end);
+        eventRepo.createMatch(ev.getId(), created);
+        Console.WriteLine($"Match created with ID {created.getId()}.");
+        waitForEnter();
+        return created;
+    }
+
+    public bool updateEvent()
+    {
+        ConsolePanes.log("FTS.updateEvent()");
+        ConsolePanes.clearMain();
+
+        List<Event> events = eventRepo.getEvents();
+        if (events.Count == 0)
+        {
+            Console.WriteLine("No events are available.");
+            waitForEnter();
+            return false;
+        }
+
+        foreach (Event e in events)
+        {
+            Console.WriteLine($"{e.getId()}. {e.getName()}");
+        }
+
+        Event? current = eventRepo.findEventById(readInt("Event ID", events[0].getId()));
+        if (current == null)
+        {
+            Console.WriteLine("Event not found.");
+            waitForEnter();
+            return false;
+        }
+
+        string name = readText("New name", current.getName());
+        int start = readTimestamp("New start (yyyy-MM-dd HH:mm)", current.getStartTimestamp());
+        int end = readTimestamp("New end (yyyy-MM-dd HH:mm)", current.getEndTimestamp());
+
+        Event updated = new(current.getId(), name, start, end);
+        bool result = eventRepo.updateEvent(current.getId(), updated);
+        Console.WriteLine(result ? "Event updated." : "Event update failed.");
+        waitForEnter();
+        return result;
+    }
+
+    public bool updateMatch()
+    {
+        ConsolePanes.log("FTS.updateMatch()");
+        ConsolePanes.clearMain();
+
+        List<Match> matches = eventRepo.getEvents().SelectMany(e => e.getChildren().OfType<Match>()).ToList();
+        if (matches.Count == 0)
+        {
+            Console.WriteLine("No matches are available.");
+            waitForEnter();
+            return false;
+        }
+
+        foreach (Match m in matches)
+        {
+            Console.WriteLine($"{m.getId()}. {m.getName()}");
+        }
+
+        Match? current = eventRepo.findMatchById(readInt("Match ID", matches[0].getId()));
+        if (current == null)
+        {
+            Console.WriteLine("Match not found.");
+            waitForEnter();
+            return false;
+        }
+
+        string name = readText("New name", current.getName());
+        double coefficient = readDouble("New price coefficient", current.priceCoefficient);
+        int start = readTimestamp("New start (yyyy-MM-dd HH:mm)", current.getStartTimestamp());
+        int end = readTimestamp("New end (yyyy-MM-dd HH:mm)", current.getEndTimestamp());
+
+        Match updated = new(current.getId(), name, coefficient, current.stadiumMap.clone(), start, end);
+        updated.seatStatuses = new Dictionary<int, SeatStatus>(current.seatStatuses);
+
+        bool result = eventRepo.updateMatch(current.getId(), updated);
+        Console.WriteLine(result ? "Match updated." : "Match update failed.");
+        waitForEnter();
+        return result;
+    }
+
+    public bool updateSeat()
+    {
+        ConsolePanes.log("FTS.updateSeat()");
+        ConsolePanes.clearMain();
+
+        List<Match> matches = eventRepo.getEvents().SelectMany(e => e.getChildren().OfType<Match>()).ToList();
+        if (matches.Count == 0)
+        {
+            Console.WriteLine("No matches are available.");
+            waitForEnter();
+            return false;
+        }
+
+        foreach (Match m in matches)
+        {
+            Console.WriteLine($"{m.getId()}. {m.getName()}");
+        }
+
+        Match? match = eventRepo.findMatchById(readInt("Match ID", matches[0].getId()));
+        if (match == null)
+        {
+            Console.WriteLine("Match not found.");
+            waitForEnter();
+            return false;
+        }
+
+        foreach (Seat seat in match.stadiumMap.seats)
+        {
+            SeatStatus status = match.seatStatuses.GetValueOrDefault(seat.id, SeatStatus.Free);
+            Console.WriteLine($"Seat {seat.id}: {status}");
+        }
+
+        int seatId = readInt("Seat ID", match.stadiumMap.seats.FirstOrDefault()?.id ?? 1);
+        if (match.stadiumMap.seats.All(s => s.id != seatId))
+        {
+            Console.WriteLine("Seat not found.");
+            waitForEnter();
+            return false;
+        }
+
+        Console.WriteLine("Statuses: 1 - Free, 2 - Booked, 3 - Sold, 4 - Blocked");
+        SeatStatus newStatus = readInt("New status", 1) switch
+        {
+            2 => SeatStatus.Booked,
+            3 => SeatStatus.Sold,
+            4 => SeatStatus.Blocked,
+            _ => SeatStatus.Free,
+        };
+
+        Event? owner = eventRepo.getEvents().FirstOrDefault(e => e.findMatchById(match.getId()) != null);
+        if (owner == null)
+        {
+            Console.WriteLine("Event for this match not found.");
+            waitForEnter();
+            return false;
+        }
+
+        bool result = owner.setSeatStatus(match.getId(), seatId, newStatus);
+        Console.WriteLine(result ? "Seat status updated." : "Seat status is already set to this value.");
+        waitForEnter();
+        return result;
+    }
+
+    private static string readText(string prompt, string fallback)
+    {
+        Console.Write($"{prompt} [{fallback}]: ");
+        string? input = Console.ReadLine();
+        return string.IsNullOrWhiteSpace(input) ? fallback : input.Trim();
+    }
+
+    private static int readInt(string prompt, int fallback)
+    {
+        Console.Write($"{prompt} [{fallback}]: ");
+        string? input = Console.ReadLine();
+        return int.TryParse(input, out int value) ? value : fallback;
+    }
+
+    private static double readDouble(string prompt, double fallback)
+    {
+        Console.Write($"{prompt} [{fallback:F2}]: ");
+        string? input = Console.ReadLine();
+        return double.TryParse(input, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out double value) ? value : fallback;
+    }
+
+    private static int readTimestamp(string prompt, int fallback)
+    {
+        string defaultValue = DateTimeOffset.FromUnixTimeSeconds(fallback).ToString("yyyy-MM-dd HH:mm");
+        Console.Write($"{prompt} [{defaultValue}]: ");
+        string? input = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return fallback;
+        }
+
+        if (!DateTime.TryParseExact(input.Trim(),
+                new[] { "yyyy-MM-dd HH:mm", "yyyy-MM-dd" },
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out DateTime value))
+        {
+            Console.WriteLine("Invalid date, using the default value.");
+            return fallback;
+        }
+
+        return (int)new DateTimeOffset(value, TimeSpan.Zero).ToUnixTimeSeconds();
     }
 
     public void attach(AnalyticsObserver o)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.attach(o={o.GetType().Name})");
+        ConsolePanes.log($"FTS.attach(o={o.GetType().Name})");
         reports.Add(o);
     }
 
     public void detach(AnalyticsObserver o)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.detach(o={o.GetType().Name})");
+        ConsolePanes.log($"FTS.detach(o={o.GetType().Name})");
         reports.Remove(o);
     }
 
     public void notifyObservers(int eventId)
     {
-        Console.WriteLine($"[ВЫЗОВ] FTS.notifyObservers(eventId={eventId})");
+        ConsolePanes.log($"FTS.notifyObservers(eventId={eventId})");
         if (analyticsEvent == null || analyticsEvent.getId() != eventId)
         {
             return;
